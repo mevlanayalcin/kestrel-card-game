@@ -211,9 +211,11 @@ export function evaluateTrick(cards) {
   };
 }
 
-export function resolveClash(playerTrick, oppTrick, playerStartWard = 0, oppStartWard = 0) {
+export function resolveClash(playerTrick, oppTrick, playerStartWard = 0, oppStartWard = 0, oppRelic = null) {
   const playerTrumps = !oppTrick.ignoreEnemyTrump && doesSuitTrump(playerTrick.leadSuit, oppTrick.leadSuit);
   const oppTrumps = !playerTrick.ignoreEnemyTrump && doesSuitTrump(oppTrick.leadSuit, playerTrick.leadSuit);
+  const relicPwr = oppRelic?.powerBonus ?? 0;
+  const relicHeal = oppRelic?.healBonus ?? 0;
 
   const playerPower = Math.max(
     1,
@@ -221,7 +223,7 @@ export function resolveClash(playerTrick, oppTrick, playerStartWard = 0, oppStar
   );
   const oppPower = Math.max(
     1,
-    oppTrick.totalPower + (oppTrumps ? 3 : 0) - playerTrick.chill,
+    oppTrick.totalPower + relicPwr + (oppTrumps ? 3 : 0) - playerTrick.chill,
   );
 
   const playerWardPool = playerStartWard + playerTrick.ward;
@@ -284,7 +286,8 @@ export function resolveClash(playerTrick, oppTrick, playerStartWard = 0, oppStar
     damageToOpp,
     damageToPlayer,
     playerHeal: playerTrick.heal,
-    oppHeal: oppTrick.heal,
+    oppHeal: oppTrick.heal + relicHeal,
+    oppRelicTriggered: Boolean(oppRelic?.triggered),
     playerScoreGain,
     oppScoreGain,
     tieBonusLantern,

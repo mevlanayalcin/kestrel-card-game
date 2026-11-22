@@ -26,20 +26,24 @@ function chooseTacticalPlayerPlay(engine) {
 }
 
 function chooseRecklessPlayerPlay(engine) {
-  // Simulates a hurried player ignoring rival tells and playing single un-comboed or trumped cards
-  const subsets = enumerateValidSubsets(engine.playerHand, engine.playerLanterns, 1);
+  // Simulates a hurried player playing un-comboed / trumped 2-card hands against Corvus's tells
+  const subsets = enumerateValidSubsets(engine.playerHand, engine.playerLanterns, 2);
   if (subsets.length === 0) return [];
   const oppSuit = engine.oppTelegraph?.leadSuit;
+  const oppEst = engine.oppTelegraph?.estimatedPower ?? 14;
   let chosen = subsets[0];
-  let bestWeakScore = -Infinity;
+  let bestScore = -Infinity;
 
   for (const subset of subsets) {
-    const card = subset[0];
-    const getsTrumped = doesSuitTrump(oppSuit, card.suit);
-    let weakness = (10 - card.rank) * 1.2 + (getsTrumped ? 5 : 0);
-    if (card.suit === 'brass') weakness -= 3;
-    if (weakness > bestWeakScore) {
-      bestWeakScore = weakness;
+    const tr = evaluateTrick(subset);
+    const getsTrumped = doesSuitTrump(oppSuit, tr.leadSuit);
+    // Prefer a realistic 2-card play that still loses fairly to Corvus's bigger combo
+    let score = (subset.length === 2 ? 12 : 0) - tr.comboBonus * 2 + (getsTrumped ? 7 : 0);
+    if (tr.totalPower < oppEst - 2) score += 8;
+    else score -= 12;
+    if (tr.leadSuit === 'brass') score -= 4;
+    if (score > bestScore) {
+      bestScore = score;
       chosen = subset;
     }
   }
@@ -78,6 +82,7 @@ function runSimulatedPlay(engine, targetRound, seed) {
       hasCombo &&
       hasTrump &&
       ties === 0 &&
+      engine.playerHand.length === 5 &&
       engine.oppHp >= 8 &&
       engine.oppHp <= 20 &&
       engine.playerHp >= 15 &&
@@ -167,7 +172,7 @@ function runSimulatedDefeat(engine, seed) {
       trial.oppHp >= 8 &&
       trial.oppHp <= 25 &&
       trial.oppCommittedCards.length >= 2 &&
-      trial.playerPlayedCards.length >= 1
+      trial.playerPlayedCards.length === 2
     ) {
       replayDefeatInto(engine, 2, seed + offset);
       return;

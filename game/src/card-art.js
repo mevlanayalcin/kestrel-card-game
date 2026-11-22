@@ -1,4 +1,4 @@
-// Bespoke procedural playing card renderer: thumbnail-legible color+shape emblems, parchment, and filigree.
+// Heirloom illustrated playing-card renderer: parchment vellum, gilt filigree, suit cartouches, and icons.
 import { SUITS } from './cards.js';
 
 export function roundedRectPath(ctx, x, y, w, h, r) {
@@ -14,16 +14,15 @@ export function roundedRectPath(ctx, x, y, w, h, r) {
 
 export function drawSuitEmblem(ctx, suitId, cx, cy, radius, options = {}) {
   const suit = SUITS[suitId] ?? SUITS.brass;
-  const monochrome = options.monochrome ?? false;
-  const fillPrimary = monochrome ? (options.color ?? '#FBF4E3') : suit.color;
-  const fillBright = monochrome ? (options.color ?? '#FFFFFF') : suit.bright;
-  const strokeDeep = monochrome ? 'rgba(0,0,0,0.28)' : suit.deep;
+  const mono = options.monochrome ?? false;
+  const fillPrimary = mono ? (options.color ?? '#FBF4E3') : suit.color;
+  const fillBright = mono ? (options.color ?? '#FFFFFF') : suit.bright;
+  const strokeDeep = mono ? 'rgba(0,0,0,0.32)' : suit.deep;
 
   ctx.save();
   ctx.translate(cx, cy);
 
   if (suitId === 'ember') {
-    // Bold 4-pointed Crimson Flame Diamond with bright golden-orange inner spark
     ctx.beginPath();
     ctx.moveTo(0, -radius * 1.12);
     ctx.quadraticCurveTo(radius * 0.42, -radius * 0.36, radius * 0.92, 0);
@@ -33,73 +32,65 @@ export function drawSuitEmblem(ctx, suitId, cx, cy, radius, options = {}) {
     ctx.closePath();
 
     const grad = ctx.createLinearGradient(0, -radius, 0, radius);
-    grad.addColorStop(0, fillBright);
-    grad.addColorStop(0.55, fillPrimary);
-    grad.addColorStop(1, strokeDeep);
-    ctx.fillStyle = monochrome ? fillPrimary : grad;
+    grad.addColorStop(0, '#FF5C47');
+    grad.addColorStop(0.55, '#C8221D');
+    grad.addColorStop(1, '#7A110E');
+    ctx.fillStyle = mono ? fillPrimary : grad;
     ctx.fill();
-    ctx.lineWidth = Math.max(1.5, radius * 0.09);
+    ctx.lineWidth = Math.max(1.8, radius * 0.105);
     ctx.strokeStyle = strokeDeep;
     ctx.stroke();
 
-    if (!monochrome) {
+    if (!mono) {
       ctx.beginPath();
-      ctx.moveTo(0, -radius * 0.58);
-      ctx.quadraticCurveTo(radius * 0.28, -radius * 0.08, 0, radius * 0.56);
-      ctx.quadraticCurveTo(-radius * 0.28, -radius * 0.08, 0, -radius * 0.58);
+      ctx.moveTo(0, -radius * 0.56);
+      ctx.quadraticCurveTo(radius * 0.28, -radius * 0.06, 0, radius * 0.52);
+      ctx.quadraticCurveTo(-radius * 0.28, -radius * 0.06, 0, -radius * 0.56);
       ctx.closePath();
-      ctx.fillStyle = '#FFE07A';
+      ctx.fillStyle = '#FFE478';
       ctx.fill();
     }
   } else if (suitId === 'tide') {
-    // Bold Sapphire Crescent Moon cradling a curling luminous wave droplet
     ctx.beginPath();
     ctx.arc(0, 0, radius * 0.98, 0.52, Math.PI * 2 - 0.52, false);
     ctx.arc(radius * 0.42, -radius * 0.08, radius * 0.72, Math.PI * 2 - 0.78, 0.78, true);
     ctx.closePath();
 
     const grad = ctx.createLinearGradient(-radius, -radius, radius, radius);
-    grad.addColorStop(0, fillBright);
-    grad.addColorStop(0.6, fillPrimary);
-    grad.addColorStop(1, strokeDeep);
-    ctx.fillStyle = monochrome ? fillPrimary : grad;
+    grad.addColorStop(0, '#3296F0');
+    grad.addColorStop(0.55, '#135BA3');
+    grad.addColorStop(1, '#092F5C');
+    ctx.fillStyle = mono ? fillPrimary : grad;
     ctx.fill();
-    ctx.lineWidth = Math.max(1.5, radius * 0.09);
+    ctx.lineWidth = Math.max(1.8, radius * 0.105);
     ctx.strokeStyle = strokeDeep;
     ctx.stroke();
 
-    // Inner tidal crest droplet inside the crescent hollow
     ctx.beginPath();
     ctx.moveTo(radius * 0.56, -radius * 0.36);
     ctx.quadraticCurveTo(radius * 0.96, 0.08 * radius, radius * 0.52, radius * 0.38);
     ctx.quadraticCurveTo(radius * 0.12, radius * 0.14, radius * 0.56, -radius * 0.36);
     ctx.closePath();
-    ctx.fillStyle = monochrome ? fillPrimary : '#A6E3FF';
+    ctx.fillStyle = mono ? fillPrimary : '#2CA2F2';
     ctx.fill();
-    if (!monochrome) {
-      ctx.lineWidth = Math.max(1, radius * 0.06);
-      ctx.strokeStyle = fillPrimary;
+    if (!mono) {
+      ctx.lineWidth = Math.max(1.2, radius * 0.07);
+      ctx.strokeStyle = '#092F5C';
       ctx.stroke();
     }
   } else if (suitId === 'bramble') {
-    // Sculptural 3-lobed Emerald Botanical Tri-Leaf / Hex Silhouette
-    const lobes = [
-      { a: -Math.PI / 2, dist: 0.44 },
-      { a: Math.PI / 6, dist: 0.44 },
-      { a: (5 * Math.PI) / 6, dist: 0.44 },
-    ];
+    const lobes = [-Math.PI / 2, Math.PI / 6, (5 * Math.PI) / 6];
     const grad = ctx.createRadialGradient(0, -radius * 0.2, radius * 0.1, 0, 0, radius);
-    grad.addColorStop(0, fillBright);
-    grad.addColorStop(0.65, fillPrimary);
-    grad.addColorStop(1, strokeDeep);
-
-    ctx.fillStyle = monochrome ? fillPrimary : grad;
+    grad.addColorStop(0, '#38C872');
+    grad.addColorStop(0.55, '#178247');
+    grad.addColorStop(1, '#0B4726');
+    ctx.fillStyle = mono ? fillPrimary : grad;
     ctx.strokeStyle = strokeDeep;
-    ctx.lineWidth = Math.max(1.5, radius * 0.09);
+    ctx.lineWidth = Math.max(1.8, radius * 0.105);
 
-    for (const lobe of lobes) {
+    for (const a of lobes) {
       ctx.save();
-      ctx.rotate(lobe.a + Math.PI / 2);
+      ctx.rotate(a + Math.PI / 2);
       ctx.beginPath();
       ctx.moveTo(0, 0);
       ctx.bezierCurveTo(-radius * 0.52, -radius * 0.25, -radius * 0.48, -radius * 0.88, 0, -radius * 1.06);
@@ -110,7 +101,6 @@ export function drawSuitEmblem(ctx, suitId, cx, cy, radius, options = {}) {
       ctx.restore();
     }
 
-    // Crisp bottom stem + golden center knot
     ctx.beginPath();
     ctx.moveTo(-radius * 0.12, radius * 0.25);
     ctx.lineTo(radius * 0.12, radius * 0.25);
@@ -120,51 +110,47 @@ export function drawSuitEmblem(ctx, suitId, cx, cy, radius, options = {}) {
     ctx.fill();
     ctx.stroke();
 
-    if (!monochrome) {
+    if (!mono) {
       ctx.beginPath();
       ctx.arc(0, 0, radius * 0.22, 0, Math.PI * 2);
-      ctx.fillStyle = '#DDF7C5';
+      ctx.fillStyle = '#EBFFD6';
       ctx.fill();
     }
   } else {
-    // Brass: 8-Spoke Burnished Gold Sunburst Gear Medallion
     const teeth = 8;
     const outerR = radius * 1.04;
     const midR = radius * 0.74;
     ctx.beginPath();
     for (let i = 0; i < teeth * 2; i += 1) {
-      const angle = (i * Math.PI) / teeth - Math.PI / 2;
+      const ang = (i * Math.PI) / teeth - Math.PI / 2;
       const r = i % 2 === 0 ? outerR : midR;
-      const px = Math.cos(angle) * r;
-      const py = Math.sin(angle) * r;
-      if (i === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
+      if (i === 0) ctx.moveTo(Math.cos(ang) * r, Math.sin(ang) * r);
+      else ctx.lineTo(Math.cos(ang) * r, Math.sin(ang) * r);
     }
     ctx.closePath();
 
     const grad = ctx.createRadialGradient(-radius * 0.15, -radius * 0.2, radius * 0.1, 0, 0, outerR);
-    grad.addColorStop(0, '#FFF1A8');
+    grad.addColorStop(0, '#FFF6BE');
     grad.addColorStop(0.5, fillBright);
-    grad.addColorStop(0.85, fillPrimary);
+    grad.addColorStop(0.88, fillPrimary);
     grad.addColorStop(1, strokeDeep);
-    ctx.fillStyle = monochrome ? fillPrimary : grad;
+    ctx.fillStyle = mono ? fillPrimary : grad;
     ctx.fill();
     ctx.lineWidth = Math.max(1.5, radius * 0.085);
     ctx.strokeStyle = strokeDeep;
     ctx.stroke();
 
-    if (!monochrome) {
+    if (!mono) {
       ctx.beginPath();
       ctx.arc(0, 0, radius * 0.42, 0, Math.PI * 2);
-      ctx.fillStyle = '#523406';
+      ctx.fillStyle = '#4E3006';
       ctx.fill();
       ctx.beginPath();
       ctx.arc(0, 0, radius * 0.23, 0, Math.PI * 2);
-      ctx.fillStyle = '#FFE88A';
+      ctx.fillStyle = '#FFEE9A';
       ctx.fill();
     }
   }
-
   ctx.restore();
 }
 
@@ -180,7 +166,6 @@ export function drawLanternIcon(ctx, cx, cy, size, lit = true) {
     ctx.arc(0, 0, size * 1.5, 0, Math.PI * 2);
     ctx.fill();
   }
-  // Lantern body diamond-hex
   ctx.beginPath();
   ctx.moveTo(0, -size * 0.92);
   ctx.lineTo(size * 0.62, -size * 0.35);
@@ -191,10 +176,9 @@ export function drawLanternIcon(ctx, cx, cy, size, lit = true) {
   ctx.closePath();
   ctx.fillStyle = lit ? '#FFD75E' : '#3C3530';
   ctx.fill();
-  ctx.lineWidth = Math.max(1.3, size * 0.15);
+  ctx.lineWidth = Math.max(1.2, size * 0.14);
   ctx.strokeStyle = lit ? '#7B4F08' : '#1E1A17';
   ctx.stroke();
-
   if (lit) {
     ctx.beginPath();
     ctx.moveTo(0, -size * 0.42);
@@ -261,7 +245,6 @@ export function drawSpeakerIcon(ctx, cx, cy, size, muted = false) {
   ctx.lineTo(-size * 0.72, size * 0.32);
   ctx.closePath();
   ctx.fill();
-
   if (muted) {
     ctx.beginPath();
     ctx.moveTo(size * 0.38, -size * 0.38);
@@ -280,68 +263,215 @@ export function drawSpeakerIcon(ctx, cx, cy, size, muted = false) {
   ctx.restore();
 }
 
-export function drawCardBack(ctx, w, h, tellOptions = null) {
-  const r = Math.max(8, w * 0.085);
+function drawSuitCartouche(ctx, card, cx, cy, cw, ch) {
+  const r = cw * 0.44;
+  ctx.save();
+  // Arched illuminated-manuscript cartouche path
+  ctx.beginPath();
+  ctx.moveTo(cx - cw / 2, cy + ch / 2 - 4);
+  ctx.lineTo(cx - cw / 2, cy - ch * 0.08);
+  ctx.arc(cx, cy - ch * 0.08, cw / 2, Math.PI, 0, false);
+  ctx.lineTo(cx + cw / 2, cy + ch / 2 - 4);
+  ctx.quadraticCurveTo(cx + cw / 2, cy + ch / 2, cx + cw / 2 - 4, cy + ch / 2);
+  ctx.lineTo(cx - cw / 2 + 4, cy + ch / 2);
+  ctx.quadraticCurveTo(cx - cw / 2, cy + ch / 2, cx - cw / 2, cy + ch / 2 - 4);
+  ctx.closePath();
 
-  // Drop shadow & crisp dark rim
-  roundedRectPath(ctx, -w / 2, -h / 2, w, h, r);
-  const bg = ctx.createLinearGradient(-w / 2, -h / 2, w / 2, h / 2);
-  bg.addColorStop(0, '#5A1B27');
-  bg.addColorStop(0.5, '#3E111A');
-  bg.addColorStop(1, '#26090F');
+  // High-contrast complementary stained-glass backdrop so every suit emblem LEAPS off at thumbnail size!
+  const bg = ctx.createLinearGradient(cx, cy - ch * 0.52, cx, cy + ch * 0.52);
+  if (card.suit === 'ember') {
+    // Twilight plum dome -> blazing golden-ivory hearth glow behind Crimson Flame Diamond!
+    bg.addColorStop(0, '#421626');
+    bg.addColorStop(0.45, '#F6C26B');
+    bg.addColorStop(0.82, '#FFF2C6');
+    bg.addColorStop(1, '#9E461D');
+  } else if (card.suit === 'tide') {
+    // Starry midnight-navy dome -> luminous moonlit ice-aqua mist behind Deep Sapphire Crescent!
+    bg.addColorStop(0, '#0E2448');
+    bg.addColorStop(0.42, '#7AC8F5');
+    bg.addColorStop(0.78, '#E6F8FF');
+    bg.addColorStop(1, '#1A5284');
+  } else if (card.suit === 'bramble') {
+    // Deep forest canopy dome -> sunlit sage-cream glade behind Rich Emerald Tri-Leaf!
+    bg.addColorStop(0, '#123823');
+    bg.addColorStop(0.44, '#8CE0A8');
+    bg.addColorStop(0.8, '#ECFFE8');
+    bg.addColorStop(1, '#1B5A34');
+  } else {
+    // Complementary Deep Celestial Midnight-Navy Astrolabe behind Gleaming Bright Gold Sunburst Gear!
+    bg.addColorStop(0, '#101830');
+    bg.addColorStop(0.55, '#1D2C54');
+    bg.addColorStop(1, '#0C1226');
+  }
   ctx.fillStyle = bg;
   ctx.fill();
 
-  ctx.lineWidth = Math.max(2, w * 0.025);
-  ctx.strokeStyle = '#DFBA67';
-  ctx.stroke();
-
-  // Inner gilded frame
-  const inset = w * 0.08;
-  roundedRectPath(ctx, -w / 2 + inset, -h / 2 + inset, w - inset * 2, h - inset * 2, r * 0.62);
-  ctx.lineWidth = 1.4;
-  ctx.strokeStyle = 'rgba(236, 198, 114, 0.65)';
-  ctx.stroke();
-
-  // Geometric gold diamond lattice clipped inside inner frame
   ctx.save();
   ctx.clip();
-  ctx.strokeStyle = 'rgba(232, 189, 98, 0.18)';
+
+  if (card.suit === 'ember') {
+    // Radiating hearth sunbeams + brass brazier pedestal
+    ctx.strokeStyle = 'rgba(255, 245, 200, 0.45)';
+    ctx.lineWidth = 1.4;
+    for (let i = 0; i < 7; i += 1) {
+      const a = -Math.PI + (i / 6) * Math.PI;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy + ch * 0.08);
+      ctx.lineTo(cx + Math.cos(a) * cw * 0.72, cy + ch * 0.08 + Math.sin(a) * ch * 0.72);
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#592014';
+    ctx.beginPath();
+    ctx.moveTo(cx - cw * 0.34, cy + ch * 0.34);
+    ctx.lineTo(cx + cw * 0.34, cy + ch * 0.34);
+    ctx.lineTo(cx + cw * 0.22, cy + ch * 0.5);
+    ctx.lineTo(cx - cw * 0.22, cy + ch * 0.5);
+    ctx.closePath();
+    ctx.fill();
+  } else if (card.suit === 'tide') {
+    // Twinkling stars in indigo top dome + curling rolling ocean waves at base
+    ctx.fillStyle = '#FFF9D6';
+    for (const [sx, sy] of [[-0.28, -0.3], [0.28, -0.32], [0.0, -0.38], [0.33, -0.18]]) {
+      ctx.beginPath(); ctx.arc(cx + sx * cw, cy + sy * ch, 1.5, 0, Math.PI * 2); ctx.fill();
+    }
+    for (let wIdx = 0; wIdx < 2; wIdx += 1) {
+      const wy = cy + ch * (0.28 + wIdx * 0.12);
+      ctx.beginPath();
+      ctx.moveTo(cx - cw * 0.55, wy);
+      ctx.bezierCurveTo(cx - cw * 0.2, wy - 8, cx + cw * 0.1, wy + 7, cx + cw * 0.55, wy - 4);
+      ctx.lineTo(cx + cw * 0.55, cy + ch * 0.55);
+      ctx.lineTo(cx - cw * 0.55, cy + ch * 0.55);
+      ctx.closePath();
+      ctx.fillStyle = wIdx === 0 ? 'rgba(20, 92, 156, 0.55)' : 'rgba(12, 54, 98, 0.72)';
+      ctx.fill();
+    }
+  } else if (card.suit === 'bramble') {
+    // Ornate golden botanical arch vines framing the sunlit glade
+    ctx.strokeStyle = 'rgba(20, 86, 48, 0.38)';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.arc(cx, cy + ch * 0.02, r * 0.9, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = 'rgba(186, 138, 36, 0.6)';
+    ctx.lineWidth = 1.3;
+    for (const dir of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(cx + dir * cw * 0.46, cy + ch * 0.46);
+      ctx.bezierCurveTo(cx + dir * cw * 0.2, cy + ch * 0.22, cx + dir * cw * 0.44, cy - ch * 0.14, cx + dir * cw * 0.16, cy - ch * 0.36);
+      ctx.stroke();
+    }
+  } else {
+    // Gleaming celestial brass astrolabe orbits & stars on deep midnight-navy dome
+    ctx.fillStyle = '#FFF3BD';
+    for (const [sx, sy] of [[-0.32, -0.26], [0.32, -0.24], [-0.3, 0.32], [0.3, 0.3]]) {
+      ctx.beginPath(); ctx.arc(cx + sx * cw, cy + sy * ch, 1.4, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.strokeStyle = 'rgba(255, 224, 124, 0.42)';
+    ctx.lineWidth = 1.25;
+    ctx.beginPath(); ctx.arc(cx, cy + ch * 0.02, r * 0.96, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + ch * 0.02, r * 1.05, r * 0.44, 0.52, 0, Math.PI * 2);
+    ctx.ellipse(cx, cy + ch * 0.02, r * 1.05, r * 0.44, -0.52, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // Soft crisp shadow halo behind central suit emblem for razor-sharp silhouette pop!
+  ctx.save();
+  ctx.shadowColor = card.suit === 'brass' ? 'rgba(255, 218, 86, 0.72)' : 'rgba(18, 12, 8, 0.42)';
+  ctx.shadowBlur = card.suit === 'brass' ? 14 : 8;
+  drawSuitEmblem(ctx, card.suit, cx, cy + ch * 0.01, cw * 0.325);
+  ctx.restore();
+
+  // Top arch gilt tier pips (1..3 bright dots)
+  const stars = card.cost;
+  const starY = cy - ch * 0.4;
+  ctx.fillStyle = '#FFE994';
+  for (let i = 0; i < stars; i += 1) {
+    ctx.beginPath(); ctx.arc(cx + (i - (stars - 1) / 2) * 8, starY, 1.9, 0, Math.PI * 2); ctx.fill();
+  }
+
+  ctx.restore();
+
+  ctx.lineWidth = card.rank >= 7 ? 2.1 : 1.5;
+  ctx.strokeStyle = card.rank >= 7 ? '#F2C95E' : '#C99C42';
+  ctx.stroke();
+  ctx.restore();
+}
+
+export function drawCardBack(ctx, w, h, tellOptions = null) {
+  const r = Math.max(8, w * 0.085);
+
+  // 3D beveled card thickness edge
+  roundedRectPath(ctx, -w / 2 + 2, -h / 2 + 2.5, w, h, r);
+  ctx.fillStyle = '#18060A';
+  ctx.fill();
+
+  roundedRectPath(ctx, -w / 2, -h / 2, w, h, r);
+  const bg = ctx.createLinearGradient(-w / 2, -h / 2, w / 2, h / 2);
+  bg.addColorStop(0, '#621E2B');
+  bg.addColorStop(0.5, '#3E1019');
+  bg.addColorStop(1, '#23070D');
+  ctx.fillStyle = bg;
+  ctx.fill();
+  ctx.lineWidth = Math.max(2, w * 0.024);
+  ctx.strokeStyle = '#E3BE6A';
+  ctx.stroke();
+
+  const inset = w * 0.085;
+  roundedRectPath(ctx, -w / 2 + inset, -h / 2 + inset, w - inset * 2, h - inset * 2, r * 0.58);
+  ctx.lineWidth = 1.3;
+  ctx.strokeStyle = 'rgba(240, 204, 120, 0.72)';
+  ctx.stroke();
+
+  // Ornate rose-window diamond lattice
+  ctx.save();
+  ctx.clip();
+  ctx.strokeStyle = 'rgba(236, 194, 102, 0.2)';
   ctx.lineWidth = 1;
-  const step = Math.max(12, w * 0.17);
+  const step = Math.max(11, w * 0.16);
   for (let d = -h; d <= h + w; d += step) {
     ctx.beginPath();
     ctx.moveTo(-w / 2 + d, -h / 2);
     ctx.lineTo(-w / 2 + d - h, h / 2);
-    ctx.stroke();
-    ctx.beginPath();
     ctx.moveTo(-w / 2 + d - h, -h / 2);
     ctx.lineTo(-w / 2 + d, h / 2);
     ctx.stroke();
   }
+  // Corner gilded quatrefoils
+  ctx.fillStyle = 'rgba(240, 204, 120, 0.42)';
+  for (const sx of [-1, 1]) {
+    for (const sy of [-1, 1]) {
+      ctx.beginPath();
+      ctx.arc(sx * (w / 2 - inset * 1.8), sy * (h / 2 - inset * 1.8), 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
   ctx.restore();
 
-  // Central gilded medallion
-  const medR = w * 0.25;
+  // Central compass rose medallion
+  const medR = w * 0.255;
+  ctx.beginPath();
+  ctx.arc(0, 0, medR + 3, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(240, 204, 120, 0.45)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
   ctx.beginPath();
   ctx.arc(0, 0, medR, 0, Math.PI * 2);
-  ctx.fillStyle = '#2B0C13';
+  ctx.fillStyle = '#290B12';
   ctx.fill();
   ctx.lineWidth = 2;
-  ctx.strokeStyle = tellOptions ? tellOptions.color : '#E2BE6B';
+  ctx.strokeStyle = tellOptions ? tellOptions.color : '#E4BF6B';
   ctx.stroke();
 
   if (tellOptions) {
-    // Glowing rival tell wax seal on mystery committed card
-    const pulse = 0.72 + 0.28 * Math.sin(tellOptions.time * 4.5);
-    const halo = ctx.createRadialGradient(0, 0, medR * 0.2, 0, 0, medR * 1.65);
+    const pulse = 0.74 + 0.26 * Math.sin(tellOptions.time * 4.5);
+    const halo = ctx.createRadialGradient(0, 0, medR * 0.2, 0, 0, medR * 1.7);
     halo.addColorStop(0, tellOptions.color);
     halo.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.save();
-    ctx.globalAlpha = 0.42 * pulse;
+    ctx.globalAlpha = 0.45 * pulse;
     ctx.fillStyle = halo;
     ctx.beginPath();
-    ctx.arc(0, 0, medR * 1.65, 0, Math.PI * 2);
+    ctx.arc(0, 0, medR * 1.7, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
 
@@ -351,7 +481,6 @@ export function drawCardBack(ctx, w, h, tellOptions = null) {
     ctx.textBaseline = 'middle';
     ctx.fillText('?', 0, 2);
 
-    // Small tell banner at bottom of mystery card
     const bh = h * 0.16;
     roundedRectPath(ctx, -w * 0.43, h * 0.27, w * 0.86, bh, 5);
     ctx.fillStyle = tellOptions.color;
@@ -363,7 +492,7 @@ export function drawCardBack(ctx, w, h, tellOptions = null) {
     ctx.font = `800 ${Math.round(w * 0.115)}px system-ui, sans-serif`;
     ctx.fillText(tellOptions.label ?? 'TELL', 0, h * 0.27 + bh / 2 + 0.5);
   } else {
-    drawLanternIcon(ctx, 0, 0, medR * 0.7, true);
+    drawLanternIcon(ctx, 0, 0, medR * 0.68, true);
   }
 }
 
@@ -375,7 +504,6 @@ export function drawCardFace(ctx, card, w, h, state = {}) {
   const dimmed = !!state.dimmed;
   const winnerGlow = !!state.winnerGlow;
 
-  // Selection or triumph aura behind card
   if (selected || winnerGlow || hovered) {
     ctx.save();
     ctx.shadowColor = winnerGlow ? '#FFE072' : selected ? '#FFD459' : suit.bright;
@@ -386,101 +514,87 @@ export function drawCardFace(ctx, card, w, h, state = {}) {
     ctx.restore();
   }
 
-  // Ivory parchment card body
+  // 3D beveled physical card thickness edge (warm gilded parchment side)
+  roundedRectPath(ctx, -w / 2 + 2.2, -h / 2 + 2.8, w, h, r);
+  ctx.fillStyle = '#523B1F';
+  ctx.fill();
+
+  // Warm antique cream-ivory vellum body with gentle aged vignette
   roundedRectPath(ctx, -w / 2, -h / 2, w, h, r);
-  const parch = ctx.createLinearGradient(-w / 2, -h / 2, w / 2, h / 2);
-  parch.addColorStop(0, '#FFFDF5');
-  parch.addColorStop(0.55, '#F8EED8');
-  parch.addColorStop(1, '#E9D9B6');
+  const parch = ctx.createRadialGradient(-w * 0.1, -h * 0.15, w * 0.08, 0, 0, h * 0.72);
+  parch.addColorStop(0, '#FFFDF6');
+  parch.addColorStop(0.65, '#F5E7C9');
+  parch.addColorStop(1, '#DFC89B');
   ctx.fillStyle = parch;
   ctx.fill();
 
   // Thick suit-colored outer border for instant thumbnail recognition
-  ctx.lineWidth = selected || winnerGlow ? Math.max(3.6, w * 0.036) : Math.max(2.6, w * 0.028);
-  ctx.strokeStyle = selected || winnerGlow ? '#FFD866' : suit.color;
+  ctx.lineWidth = selected || winnerGlow ? Math.max(3.6, w * 0.036) : Math.max(2.7, w * 0.028);
+  ctx.strokeStyle = selected || winnerGlow ? '#FFE070' : suit.color;
   ctx.stroke();
 
-  // Subtle suit-tinted inner panel
-  const pad = w * 0.068;
-  roundedRectPath(ctx, -w / 2 + pad, -h / 2 + pad, w - pad * 2, h - pad * 2, r * 0.55);
-  ctx.fillStyle = suit.tint;
-  ctx.globalAlpha = 0.55;
-  ctx.fill();
-  ctx.globalAlpha = 1;
-  ctx.lineWidth = Math.max(1.4, w * 0.015);
-  ctx.strokeStyle = suit.color;
+  // Fine inner double-gilt frame + brass corner rivets
+  const pad = w * 0.062;
+  roundedRectPath(ctx, -w / 2 + pad, -h / 2 + pad, w - pad * 2, h - pad * 2, r * 0.52);
+  ctx.lineWidth = 1.25;
+  ctx.strokeStyle = 'rgba(182, 134, 42, 0.72)';
   ctx.stroke();
+
+  ctx.fillStyle = '#C99634';
+  for (const sx of [-1, 1]) {
+    for (const sy of [-1, 1]) {
+      ctx.beginPath();
+      ctx.arc(sx * (w / 2 - pad - 3), sy * (h / 2 - pad - 3), 1.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
 
   // Top-left GIANT high-contrast rank numeral
-  const rankFont = Math.round(w * 0.315);
+  const rankFont = Math.round(w * 0.305);
   ctx.fillStyle = suit.deep;
   ctx.font = `900 ${rankFont}px Georgia, "Times New Roman", serif`;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
-  ctx.fillText(String(card.rank), -w / 2 + w * 0.11, -h / 2 + h * 0.052);
+  ctx.fillText(String(card.rank), -w / 2 + w * 0.1, -h / 2 + h * 0.05);
 
-  // Small suit shape cleanly spaced directly beneath rank numeral
-  drawSuitEmblem(ctx, card.suit, -w / 2 + w * 0.205, -h / 2 + h * 0.322, w * 0.082);
+  // Crisp mini suit emblem neatly tucked beside/below rank
+  drawSuitEmblem(ctx, card.suit, -w / 2 + w * 0.195, -h / 2 + h * 0.3, w * 0.075);
 
-  // Top-right Lantern Cost Crest (bold dark brass medallion + glowing gold cost numeral + pips)
-  const costCx = w / 2 - w * 0.215;
-  const costCy = -h / 2 + h * 0.145;
-  const costR = w * 0.135;
-
+  // Top-right Burnished-Gold Lantern Cost Medallion + glowing pips
+  const costCx = w / 2 - w * 0.21;
+  const costCy = -h / 2 + h * 0.135;
+  const costR = w * 0.13;
   ctx.beginPath();
   ctx.arc(costCx, costCy, costR, 0, Math.PI * 2);
   const costGrad = ctx.createRadialGradient(costCx - 2, costCy - 3, 2, costCx, costCy, costR);
-  costGrad.addColorStop(0, '#443018');
-  costGrad.addColorStop(1, '#1E140A');
+  costGrad.addColorStop(0, '#4B3418');
+  costGrad.addColorStop(1, '#1D1309');
   ctx.fillStyle = costGrad;
   ctx.fill();
   ctx.lineWidth = Math.max(1.8, w * 0.02);
-  ctx.strokeStyle = '#F2C95E';
+  ctx.strokeStyle = '#F5CE62';
   ctx.stroke();
 
-  ctx.fillStyle = '#FFE485';
-  ctx.font = `900 ${Math.round(w * 0.19)}px system-ui, -apple-system, sans-serif`;
+  ctx.fillStyle = '#FFE78E';
+  ctx.font = `900 ${Math.round(w * 0.185)}px system-ui, -apple-system, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(String(card.cost), costCx, costCy + 0.5);
 
-  // Golden lantern cost pips directly under the cost medallion
-  const pipSpacing = w * 0.085;
+  const pipSpacing = w * 0.082;
   const pipStartX = costCx - ((card.cost - 1) * pipSpacing) / 2;
-  const pipY = costCy + costR + h * 0.052;
+  const pipY = costCy + costR + h * 0.048;
   for (let i = 0; i < card.cost; i += 1) {
-    drawLanternIcon(ctx, pipStartX + i * pipSpacing, pipY, w * 0.036, true);
+    drawLanternIcon(ctx, pipStartX + i * pipSpacing, pipY, w * 0.034, true);
   }
 
-  // Center GIANT geometric Suit Medallion inside engraved filigree ring
-  const medCy = h * 0.055;
-  const ringR = w * 0.305;
+  // Central Museum-Grade Jewel-Toned Arched Illustration Cartouche!
+  drawSuitCartouche(ctx, card, 0, h * 0.065, w * 0.68, h * 0.44);
 
-  ctx.beginPath();
-  ctx.arc(0, medCy, ringR, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(255, 252, 242, 0.9)';
-  ctx.fill();
-  ctx.lineWidth = Math.max(1.6, w * 0.018);
-  ctx.strokeStyle = card.rank >= 7 ? '#D8A230' : suit.color;
-  ctx.stroke();
-
-  // Outer master filigree ring on high-rank cards (7–9)
-  if (card.rank >= 7) {
-    ctx.beginPath();
-    ctx.arc(0, medCy, ringR + w * 0.035, 0, Math.PI * 2);
-    ctx.lineWidth = 1.2;
-    ctx.setLineDash([4, 3]);
-    ctx.strokeStyle = '#C98E20';
-    ctx.stroke();
-    ctx.setLineDash([]);
-  }
-
-  drawSuitEmblem(ctx, card.suit, 0, medCy, w * 0.255);
-
-  // Bottom high-contrast suit-colored effect ribbon
+  // Bottom high-contrast suit-colored effect ribbon with gold clasps
   const banW = w * 0.85;
-  const banH = h * 0.165;
-  const banY = h / 2 - banH - h * 0.068;
+  const banH = h * 0.16;
+  const banY = h / 2 - banH - h * 0.064;
   roundedRectPath(ctx, -banW / 2, banY, banW, banH, 5);
   const banGrad = ctx.createLinearGradient(-banW / 2, banY, banW / 2, banY + banH);
   banGrad.addColorStop(0, suit.deep);
@@ -488,8 +602,8 @@ export function drawCardFace(ctx, card, w, h, state = {}) {
   banGrad.addColorStop(1, suit.deep);
   ctx.fillStyle = banGrad;
   ctx.fill();
-  ctx.lineWidth = 1.2;
-  ctx.strokeStyle = '#E8C56E';
+  ctx.lineWidth = 1.3;
+  ctx.strokeStyle = '#ECC86E';
   ctx.stroke();
 
   ctx.fillStyle = '#FFFDF6';
@@ -500,7 +614,7 @@ export function drawCardFace(ctx, card, w, h, state = {}) {
 
   if (dimmed) {
     roundedRectPath(ctx, -w / 2, -h / 2, w, h, r);
-    ctx.fillStyle = 'rgba(18, 16, 14, 0.42)';
+    ctx.fillStyle = 'rgba(18, 15, 13, 0.44)';
     ctx.fill();
   }
 }
@@ -508,9 +622,8 @@ export function drawCardFace(ctx, card, w, h, state = {}) {
 export function drawCard(ctx, card, x, y, w, h, options = {}) {
   const rot = options.rot ?? 0;
   const scale = options.scale ?? 1;
-  const flip = options.flip ?? 1; // 1 = face up, -1 = face down
+  const flip = options.flip ?? 1;
   const shadow = options.shadow ?? true;
-
   const flipScaleX = Math.max(0.05, Math.abs(flip));
   const faceUp = flip >= 0;
 
@@ -521,10 +634,10 @@ export function drawCard(ctx, card, x, y, w, h, options = {}) {
 
   if (shadow) {
     ctx.save();
-    ctx.shadowColor = 'rgba(4, 9, 7, 0.58)';
-    ctx.shadowBlur = options.selected ? 22 : 14;
-    ctx.shadowOffsetX = 3;
-    ctx.shadowOffsetY = options.selected ? 12 : 7;
+    ctx.shadowColor = 'rgba(3, 8, 6, 0.64)';
+    ctx.shadowBlur = options.selected ? 24 : 15;
+    ctx.shadowOffsetX = 4;
+    ctx.shadowOffsetY = options.selected ? 13 : 8;
     roundedRectPath(ctx, -w / 2, -h / 2, w, h, Math.max(8, w * 0.088));
     ctx.fillStyle = '#18100B';
     ctx.fill();
@@ -536,6 +649,5 @@ export function drawCard(ctx, card, x, y, w, h, options = {}) {
   } else {
     drawCardBack(ctx, w, h, options.tellOptions ?? null);
   }
-
   ctx.restore();
 }

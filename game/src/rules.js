@@ -2,7 +2,7 @@
 import { createDeckBlueprint } from './cards.js';
 import { createRng, DeckPile } from './deck.js';
 import { evaluateTrick, resolveClash } from './combos.js';
-import { RIVALS, chooseOpponentPlay, buildTelegraph } from './ai.js';
+import { RIVALS, chooseOpponentPlay, buildTelegraph, applyRivalRelic } from './ai.js';
 
 export const PHASES = {
   TITLE: 'title',
@@ -185,6 +185,19 @@ export class MatchEngine {
     return evaluateTrick(this.getSelectedCards());
   }
 
+  getRivalRemainingSuits() {
+    const counts = { ember: 0, tide: 0, bramble: 0, brass: 0 };
+    if (!this.oppDeck) return counts;
+    for (const c of this.oppDeck.drawPile) counts[c.suit] += 1;
+    for (const c of this.oppHand) counts[c.suit] += 1;
+    if (this.phase === PHASES.SELECT && this.oppCommittedCards.length > 1) {
+      for (let i = 1; i < this.oppCommittedCards.length; i += 1) {
+        counts[this.oppCommittedCards[i].suit] += 1;
+      }
+    }
+    return counts;
+  }
+
   toggleSelectCard(uid) {
     if (this.phase !== PHASES.SELECT) return false;
     const card = this.playerHand.find((c) => c.uid === uid);
@@ -236,10 +249,11 @@ export class MatchEngine {
 
     const playerTrick = evaluateTrick(played);
     const oppTrick = this.oppTelegraph.trick;
+    const oppRelic = this.oppTelegraph.relic ?? applyRivalRelic(oppTrick, this.rival);
     this.playerLanterns = Math.max(0, this.playerLanterns - playerTrick.totalCost);
     this.playerLastSuit = playerTrick.leadSuit;
 
-    const clash = resolveClash(playerTrick, oppTrick, this.playerWard, this.oppWard);
+    const clash = resolveClash(playerTrick, oppTrick, this.playerWard, this.oppWard, oppRelic);
 
     // Apply Ward & Heal & Damage (Ward caps cleanly so defense shields clashes without stalling)
     this.playerWard = Math.min(6, Math.max(0, this.playerWard + playerTrick.ward - (clash.winner === 'opponent' ? clash.damageToPlayer : 0)));
@@ -307,21 +321,22 @@ export class MatchEngine {
     this.playerPlayedCards = [];
 
     const oppTrick = this.oppTelegraph.trick;
+    const oppRelic = this.oppTelegraph.relic ?? applyRivalRelic(oppTrick, this.rival);
     const bracedWard = this.playerWard + 5;
-    const rawOppDmg = Math.max(2, Math.floor(oppTrick.totalPower * 0.65) + oppTrick.burn);
+    const rawOppDmg = Math.max(2, Math.floor((oppTrick.totalPower + oppRelic.powerBonus) * 0.62) + oppTrick.burn);
     const dmg = Math.max(1, rawOppDmg - Math.max(0, bracedWard - oppTrick.pierce));
 
-    this.playerWard = 3;
-    this.playerCarryWard = 3;
+    this.playerWard = 4;
+    this.playerCarryWard = 4;
     this.playerHp = Math.max(0, this.playerHp - dmg);
-    this.oppHp = Math.min(this.oppMaxHp, this.oppHp + oppTrick.heal);
+    this.oppHp = Math.min(this.oppMaxHp, this.oppHp + oppTrick.heal + oppRelic.healBonus);
     this.playerNextBonusLantern += 2;
     this.playerScore += 35;
     this.oppScore += 75;
 
     const syntheticPlayerTrick = evaluateTrick([]);
-    syntheticPlayerTrick.comboName = 'BRACE & CYCLE';
-    syntheticPlayerTrick.comboShort = 'CYCLE +5🛡';
+    syntheticPlayerTrick.comboName = 'KINDLE HEARTH';
+    syntheticPlayerTrick.comboShort = 'KINDLE +2✦';
 
     this.lastClash = {
       round: this.round,
@@ -329,28 +344,28 @@ export class MatchEngine {
       oppTrick,
       winner: 'opponent',
       playerPower: 0,
-      oppPower: oppTrick.totalPower,
+      oppPower: oppTrick.totalPower + oppRelic.powerBonus,
       playerTrumps: false,
       oppTrumps: false,
       counterBreak: false,
       damageToOpp: 0,
       damageToPlayer: dmg,
       playerHeal: 0,
-      oppHeal: oppTrick.heal,
+      oppHeal: oppTrick.heal + oppRelic.healBonus,
       playerScoreGain: 35,
       oppScoreGain: 75,
       tieBonusLantern: 0,
-      headline: `BRACED & CYCLED (+2✦ NEXT TURN)`,
+      headline: `KINDLED HEARTH (+4 WARD · +2 LANTERNS NEXT)`,
     };
 
     this.chronicle.unshift({
       round: this.round,
       winner: 'cycle',
       playerPower: 0,
-      oppPower: oppTrick.totalPower,
+      oppPower: oppTrick.totalPower + oppRelic.powerBonus,
       playerSuit: 'brass',
       oppSuit: oppTrick.leadSuit,
-      playerCombo: 'CYCLE +2✦',
+      playerCombo: 'KINDLE +2✦',
       oppCombo: oppTrick.comboShort,
       damage: dmg,
       trumped: false,

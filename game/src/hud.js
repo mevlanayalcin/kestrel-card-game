@@ -1,354 +1,225 @@
-// HUD medallions, Trump Wheel, Combo Synergy Guide, Chronicle, and Title / Victory / Defeat screens.
-import { SUITS, createTitleShowcaseCards, doesSuitTrump } from './cards.js';
+// HUD medallions, Rival Cameos & Relics, Suit Tracker, Trump Wheel, Combo Guide, and Screen Overlays.
+import { SUITS, SUIT_IDS, createTitleShowcaseCards, doesSuitTrump } from './cards.js';
 import { COMBO_CATALOG } from './combos.js';
 import { RIVALS } from './ai.js';
 import { PHASES, MAX_ROUNDS } from './rules.js';
 import { drawCard, drawSuitEmblem, drawLanternIcon, drawHeartIcon, drawShieldIcon, drawSpeakerIcon, roundedRectPath } from './card-art.js';
+import { drawRivalPortrait, drawParlorCandle, drawWoodenDeckTray, drawLanternCoin } from './portraits.js';
 import { STAGE_W, STAGE_H, CENTER_X } from './renderer.js';
 
 const SHOWCASE_CARDS = createTitleShowcaseCards();
+const UI_FONT = 'system-ui, -apple-system, sans-serif';
+
+function label(ctx, text, x, y, font, color, align = 'center') {
+  ctx.fillStyle = color;
+  ctx.font = font;
+  ctx.textAlign = align;
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, x, y);
+}
+
+function box(ctx, x, y, w, h, r, fill, stroke, lw = 1.2) {
+  roundedRectPath(ctx, x, y, w, h, r);
+  if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+  if (stroke) { ctx.lineWidth = lw; ctx.strokeStyle = stroke; ctx.stroke(); }
+}
+
+function hpBar(ctx, x, y, w, h, ratio, bg, c0, c1) {
+  box(ctx, x, y, w, h, 5, bg, null);
+  const pct = Math.max(0, Math.min(1, ratio));
+  if (pct <= 0) return;
+  const g = ctx.createLinearGradient(x, y, x + w, y);
+  g.addColorStop(0, c0);
+  g.addColorStop(1, c1);
+  box(ctx, x, y, Math.max(8, w * pct), h, 5, g, null);
+}
 
 export class HudRenderer {
-  constructor() {
-    this.buttons = [];
-  }
-
-  resetButtons() {
-    this.buttons = [];
-  }
-
-  registerButton(id, x, y, w, h, data = null) {
-    this.buttons.push({ id, x, y, w, h, data });
-  }
+  constructor() { this.buttons = []; }
+  resetButtons() { this.buttons = []; }
+  registerButton(id, x, y, w, h, data = null) { this.buttons.push({ id, x, y, w, h, data }); }
 
   hitTestButton(x, y) {
     for (let i = this.buttons.length - 1; i >= 0; i -= 1) {
       const b = this.buttons[i];
-      if (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) {
-        return b;
-      }
+      if (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) return b;
     }
     return null;
   }
 
   render(ctx, engine, anim, sound, uiState) {
     this.resetButtons();
-
     if (engine.phase === PHASES.TITLE) {
       this.drawTitleScreen(ctx, engine, anim, sound, uiState);
     } else {
       this.drawLeftColumn(ctx, engine);
       this.drawRightColumn(ctx, engine, sound, uiState);
-
-      if (engine.phase === PHASES.SELECT || engine.phase === PHASES.CLASH) {
-        this.drawCenterActionBar(ctx, engine, uiState);
-      } else if (engine.phase === PHASES.VICTORY) {
-        this.drawVictoryBanner(ctx, engine, uiState);
-      } else if (engine.phase === PHASES.DEFEAT) {
-        this.drawDefeatBanner(ctx, engine, uiState);
-      }
+      if (engine.phase === PHASES.SELECT || engine.phase === PHASES.CLASH) this.drawCenterActionBar(ctx, engine, uiState);
+      else if (engine.phase === PHASES.VICTORY) this.drawOutcomeBanner(ctx, engine, anim, uiState, true);
+      else if (engine.phase === PHASES.DEFEAT) this.drawOutcomeBanner(ctx, engine, anim, uiState, false);
     }
-
-    if (engine.rulesOpen) {
-      this.drawRulesModal(ctx, uiState);
-    }
+    if (engine.rulesOpen) this.drawRulesModal(ctx, uiState);
   }
 
-  drawPanelBox(ctx, x, y, w, h, borderColor = 'rgba(227, 188, 100, 0.62)', fillTop = 'rgba(22, 16, 12, 0.88)', fillBot = 'rgba(13, 10, 8, 0.92)') {
-    roundedRectPath(ctx, x, y, w, h, 14);
-    const grad = ctx.createLinearGradient(x, y, x, y + h);
-    grad.addColorStop(0, fillTop);
-    grad.addColorStop(1, fillBot);
-    ctx.fillStyle = grad;
-    ctx.fill();
-    ctx.lineWidth = 1.8;
-    ctx.strokeStyle = borderColor;
-    ctx.stroke();
+  drawPanelBox(ctx, x, y, w, h, border = 'rgba(227,188,100,0.62)', top = 'rgba(22,16,12,0.89)', bot = 'rgba(12,10,8,0.93)') {
+    const g = ctx.createLinearGradient(x, y, x, y + h);
+    g.addColorStop(0, top);
+    g.addColorStop(1, bot);
+    box(ctx, x, y, w, h, 14, g, border, 1.8);
   }
 
-  drawButton(ctx, id, x, y, w, h, label, style = {}, data = null, hoveredId = null) {
-    const hovered = hoveredId === id;
-    const disabled = !!style.disabled;
-    const primary = !!style.primary;
-    const crimson = !!style.crimson;
-
-    if (!disabled) this.registerButton(id, x, y, w, h, data);
+  drawButton(ctx, id, x, y, w, h, text, style = {}, data = null, hoveredId = null) {
+    const hov = hoveredId === id;
+    const dis = !!style.disabled;
+    const pri = !!style.primary;
+    const crim = !!style.crimson;
+    if (!dis) this.registerButton(id, x, y, w, h, data);
 
     ctx.save();
-    roundedRectPath(ctx, x, y, w, h, style.radius ?? 10);
-    if (disabled) {
-      ctx.fillStyle = 'rgba(42, 36, 30, 0.72)';
-      ctx.strokeStyle = 'rgba(132, 114, 84, 0.45)';
-    } else if (crimson) {
+    let fill = 'rgba(42,36,30,0.72)';
+    let stroke = 'rgba(132,114,84,0.45)';
+    if (!dis) {
       const g = ctx.createLinearGradient(x, y, x, y + h);
-      g.addColorStop(0, hovered ? '#D94942' : '#BA3630');
-      g.addColorStop(1, hovered ? '#9E2822' : '#7E1E19');
-      ctx.fillStyle = g;
-      ctx.strokeStyle = hovered ? '#FFE485' : '#F2B89B';
-    } else if (primary) {
-      const g = ctx.createLinearGradient(x, y, x, y + h);
-      g.addColorStop(0, hovered ? '#FFE278' : '#F0C554');
-      g.addColorStop(1, hovered ? '#D49A24' : '#B57B14');
-      ctx.fillStyle = g;
-      ctx.strokeStyle = hovered ? '#FFF9DA' : '#FFE48A';
-    } else {
-      const g = ctx.createLinearGradient(x, y, x, y + h);
-      g.addColorStop(0, hovered ? 'rgba(66, 48, 30, 0.96)' : 'rgba(38, 28, 20, 0.92)');
-      g.addColorStop(1, hovered ? 'rgba(42, 30, 18, 0.96)' : 'rgba(22, 16, 12, 0.94)');
-      ctx.fillStyle = g;
-      ctx.strokeStyle = hovered ? '#FFE07A' : 'rgba(227, 188, 100, 0.65)';
+      if (crim) {
+        g.addColorStop(0, hov ? '#D94942' : '#BA3630');
+        g.addColorStop(1, hov ? '#9E2822' : '#7E1E19');
+        stroke = hov ? '#FFE485' : '#F2B89B';
+      } else if (pri) {
+        g.addColorStop(0, hov ? '#FFE278' : '#F0C554');
+        g.addColorStop(1, hov ? '#D49A24' : '#B57B14');
+        stroke = hov ? '#FFF9DA' : '#FFE48A';
+      } else {
+        g.addColorStop(0, hov ? 'rgba(66,48,30,0.96)' : 'rgba(38,28,20,0.92)');
+        g.addColorStop(1, hov ? 'rgba(42,30,18,0.96)' : 'rgba(22,16,12,0.94)');
+        stroke = hov ? '#FFE07A' : 'rgba(227,188,100,0.65)';
+      }
+      fill = g;
+      if (hov) { ctx.shadowColor = pri ? 'rgba(255,212,89,0.55)' : 'rgba(255,212,89,0.3)'; ctx.shadowBlur = 14; }
     }
-    if (hovered && !disabled) {
-      ctx.shadowColor = primary ? 'rgba(255, 212, 89, 0.55)' : 'rgba(255, 212, 89, 0.3)';
-      ctx.shadowBlur = 14;
-    }
-    ctx.fill();
-    ctx.lineWidth = primary || crimson ? 2.2 : 1.5;
-    ctx.stroke();
-
+    box(ctx, x, y, w, h, style.radius ?? 10, fill, stroke, pri || crim ? 2.2 : 1.5);
     ctx.shadowBlur = 0;
-    ctx.fillStyle = disabled ? '#8E816E' : primary ? '#1E1205' : '#FFF4DC';
-    ctx.font = `900 ${style.fontSize ?? 15}px system-ui, -apple-system, sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(label, x + w / 2, y + h / 2 + 0.5);
+    if (text) label(ctx, text, x + w / 2, y + h / 2 + 0.5, `900 ${style.fontSize ?? 15}px ${UI_FONT}`, dis ? '#8E816E' : pri ? '#1E1205' : '#FFF4DC');
     ctx.restore();
   }
 
   drawLeftColumn(ctx, engine) {
     const x = 36;
     const w = 192;
-
-    // 1. OPPONENT MEDALLION PANEL (y = 38..184)
     const oppDead = engine.oppHp <= 0;
-    this.drawPanelBox(ctx, x, 38, w, 146, oppDead ? '#8C4440' : engine.rival.accent);
 
-    // Rival suit crest + name
-    drawSuitEmblem(ctx, engine.rival.favSuit, x + 26, 66, 13);
-    ctx.fillStyle = '#FFF5DC';
-    ctx.font = '900 17px Georgia, serif';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(engine.rival.name.toUpperCase(), x + 46, 61);
+    // 1. Opponent medallion: painted cameo portrait, signature Relic passive, HP & Score
+    this.drawPanelBox(ctx, x, 36, w, 168, oppDead ? '#8C4440' : engine.rival.accent);
+    drawRivalPortrait(ctx, engine.rival.id, x + 34, 70, 21);
+    label(ctx, engine.rival.name.toUpperCase(), x + 64, 62, '900 16px Georgia, serif', '#FFF5DC', 'left');
+    label(ctx, engine.rival.title.toUpperCase(), x + 64, 79, `700 9.5px ${UI_FONT}`, '#C9B796', 'left');
 
-    ctx.fillStyle = '#C9B796';
-    ctx.font = '700 10px system-ui, sans-serif';
-    ctx.fillText(engine.rival.title.toUpperCase(), x + 46, 77);
+    box(ctx, x + 10, 98, w - 20, 21, 6, 'rgba(255,206,102,0.12)', 'rgba(240,198,104,0.42)', 1);
+    label(ctx, `${engine.rival.relicName}: ${engine.rival.relicDesc}`, x + w / 2, 108.5, `800 9.3px ${UI_FONT}`, '#FFE496');
 
-    // HUGE Opponent Life display + HP Bar (exact measured spacing + custom vector heart)
-    drawHeartIcon(ctx, x + 28, 113, 11.5, oppDead ? '#C84842' : '#FF6B5C');
-    ctx.fillStyle = oppDead ? '#FF6B60' : '#FF8274';
-    ctx.font = '900 32px Georgia, serif';
-    ctx.textAlign = 'left';
-    const oppHpStr = String(engine.oppHp);
-    ctx.fillText(oppHpStr, x + 46, 114);
-    const oppHpW = ctx.measureText(oppHpStr).width;
-    ctx.fillStyle = '#B8A68A';
-    ctx.font = '700 15px system-ui, sans-serif';
-    ctx.fillText(`/${engine.oppMaxHp}`, x + 50 + oppHpW, 118);
+    drawHeartIcon(ctx, x + 26, 139, 10.5, oppDead ? '#C84842' : '#FF6B5C');
+    const oStr = String(engine.oppHp);
+    label(ctx, oStr, x + 44, 140, '900 30px Georgia, serif', oppDead ? '#FF6B60' : '#FF8274', 'left');
+    label(ctx, `/${engine.oppMaxHp}`, x + 48 + ctx.measureText(oStr).width, 144, `700 14px ${UI_FONT}`, '#B8A68A', 'left');
+    hpBar(ctx, x + 14, 160, w - 28, 10, engine.oppHp / engine.oppMaxHp, '#2B1615', '#D93B32', '#FF7A59');
 
-    // HP Bar
-    const barX = x + 16;
-    const barW = w - 32;
-    roundedRectPath(ctx, barX, 134, barW, 11, 5);
-    ctx.fillStyle = '#2B1615';
-    ctx.fill();
-    const oppPct = Math.max(0, Math.min(1, engine.oppHp / engine.oppMaxHp));
-    if (oppPct > 0) {
-      roundedRectPath(ctx, barX, 134, Math.max(8, barW * oppPct), 11, 5);
-      const hpG = ctx.createLinearGradient(barX, 134, barX + barW, 134);
-      hpG.addColorStop(0, '#D93B32');
-      hpG.addColorStop(1, '#FF7A59');
-      ctx.fillStyle = hpG;
-      ctx.fill();
-    }
-
-    // Opp Score & Ward strip
-    ctx.fillStyle = '#E5D5B5';
-    ctx.font = '800 12px system-ui, sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText(`SCORE ${engine.oppScore}`, x + 16, 165);
+    label(ctx, `SCORE ${engine.oppScore}`, x + 14, 187, `800 11.5px ${UI_FONT}`, '#E5D5B5', 'left');
     if (engine.oppWard > 0) {
-      drawShieldIcon(ctx, x + w - 34, 164, 7.5, '#FFD459');
-      ctx.fillStyle = '#FFD459';
-      ctx.textAlign = 'right';
-      ctx.fillText(String(engine.oppWard), x + w - 14, 165);
+      drawShieldIcon(ctx, x + w - 33, 186, 7, '#FFD459');
+      label(ctx, String(engine.oppWard), x + w - 14, 187, `800 12px ${UI_FONT}`, '#FFD459', 'right');
     } else {
-      drawLanternIcon(ctx, x + w - 34, 164, 6.5, true);
-      ctx.fillStyle = '#E6CA78';
-      ctx.textAlign = 'right';
-      ctx.fillText(String(engine.oppLanterns), x + w - 14, 165);
+      drawLanternIcon(ctx, x + w - 33, 186, 6, true);
+      label(ctx, String(engine.oppLanterns), x + w - 14, 187, `800 12px ${UI_FONT}`, '#E6CA78', 'right');
     }
 
-    // 2. DRAW DECK + ELEMENTAL TRUMP WHEEL (y = 200..476)
-    this.drawPanelBox(ctx, x, 200, w, 276, 'rgba(227, 188, 100, 0.5)');
+    // 2. Wooden Deck Tray + Rival Suit Tracker + Elemental Trump Wheel
+    this.drawPanelBox(ctx, x, 214, w, 272, 'rgba(227,188,100,0.52)');
+    drawWoodenDeckTray(ctx, x + 12, 224, 72, 92);
+    for (let s = 3; s >= 0; s -= 1) drawCard(ctx, null, x + 50 - s * 1.8, 272 - s * 1.8, 52, 74, { flip: -1, shadow: s === 3 });
+    label(ctx, 'DECK', x + 94, 240, `800 11px ${UI_FONT}`, '#F3D486', 'left');
+    label(ctx, String(engine.playerDeck?.drawCount ?? 0), x + 94, 266, '900 28px Georgia, serif', '#FFF7E2', 'left');
+    label(ctx, `DISC ${engine.playerDeck?.discardCount ?? 0}`, x + 94, 290, `700 10.5px ${UI_FONT}`, '#B7A78A', 'left');
 
-    // Miniature 3D stacked Draw Deck at top of panel
-    const deckCx = x + 56;
-    const deckCy = 262;
-    for (let s = 3; s >= 0; s -= 1) {
-      drawCard(ctx, null, deckCx - s * 2, deckCy - s * 2, 58, 82, {
-        flip: -1,
-        shadow: s === 3,
-      });
+    box(ctx, x + 10, 323, w - 20, 36, 8, 'rgba(10,22,17,0.72)', 'rgba(227,188,100,0.3)', 1);
+    label(ctx, 'RIVAL SUITS LEFT', x + w / 2, 332.5, `800 8.5px ${UI_FONT}`, '#D8C293');
+    const remSuits = engine.getRivalRemainingSuits();
+    for (let i = 0; i < SUIT_IDS.length; i += 1) {
+      const sid = SUIT_IDS[i];
+      drawSuitEmblem(ctx, sid, x + 22 + i * 42, 348, 6.8);
+      label(ctx, String(remSuits[sid]), x + 34 + i * 42, 349, `800 11px ${UI_FONT}`, '#FFF2D4', 'left');
     }
-    ctx.fillStyle = '#F3D486';
-    ctx.font = '800 12px system-ui, sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText('DECK', x + 98, 240);
-    ctx.fillStyle = '#FFF7E2';
-    ctx.font = '900 28px Georgia, serif';
-    ctx.fillText(String(engine.playerDeck?.drawCount ?? 0), x + 98, 267);
-    ctx.fillStyle = '#B7A78A';
-    ctx.font = '700 11px system-ui, sans-serif';
-    ctx.fillText(`DISC ${engine.playerDeck?.discardCount ?? 0}`, x + 98, 292);
 
-    // Divider line
-    ctx.strokeStyle = 'rgba(227, 188, 100, 0.25)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(x + 14, 316);
-    ctx.lineTo(x + w - 14, 316);
-    ctx.stroke();
-
-    // Elemental Trump Triangle Diagram (Color + Shape!)
-    ctx.fillStyle = '#F2CE74';
-    ctx.font = '800 11px system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('TRUMP CYCLE (+3 PWR)', x + w / 2, 333);
-
+    label(ctx, 'TRUMP CYCLE (+3 PWR)', x + w / 2, 372, `800 10.5px ${UI_FONT}`, '#F2CE74');
     const wCx = x + w / 2;
-    const wCy = 402;
-    const nodes = [
-      { id: 'ember', px: wCx, py: wCy - 42 },
-      { id: 'bramble', px: wCx + 48, py: wCy + 28 },
-      { id: 'tide', px: wCx - 48, py: wCy + 28 },
-    ];
-
-    // Circular gold arrows connecting Ember -> Bramble -> Tide -> Ember
-    ctx.save();
-    ctx.strokeStyle = 'rgba(240, 206, 118, 0.65)';
-    ctx.lineWidth = 2;
+    const wCy = 429;
+    const nodes = [{ id: 'ember', px: wCx, py: wCy - 35 }, { id: 'bramble', px: wCx + 45, py: wCy + 23 }, { id: 'tide', px: wCx - 45, py: wCy + 23 }];
+    ctx.strokeStyle = 'rgba(240,206,118,0.65)';
+    ctx.lineWidth = 1.9;
     for (let i = 0; i < 3; i += 1) {
       const a = nodes[i];
       const b = nodes[(i + 1) % 3];
       const dx = b.px - a.px;
       const dy = b.py - a.py;
       const len = Math.hypot(dx, dy);
-      const sx = a.px + (dx / len) * 20;
-      const sy = a.py + (dy / len) * 20;
-      const ex = b.px - (dx / len) * 20;
-      const ey = b.py - (dy / len) * 20;
+      const ex = b.px - (dx / len) * 18;
+      const ey = b.py - (dy / len) * 18;
       ctx.beginPath();
-      ctx.moveTo(sx, sy);
+      ctx.moveTo(a.px + (dx / len) * 18, a.py + (dy / len) * 18);
       ctx.lineTo(ex, ey);
       ctx.stroke();
-
-      // Arrowhead
       const ang = Math.atan2(dy, dx);
+      ctx.fillStyle = '#F2CE74';
       ctx.beginPath();
       ctx.moveTo(ex, ey);
-      ctx.lineTo(ex - Math.cos(ang - 0.5) * 7, ey - Math.sin(ang - 0.5) * 7);
-      ctx.lineTo(ex - Math.cos(ang + 0.5) * 7, ey - Math.sin(ang + 0.5) * 7);
+      ctx.lineTo(ex - Math.cos(ang - 0.5) * 6.5, ey - Math.sin(ang - 0.5) * 6.5);
+      ctx.lineTo(ex - Math.cos(ang + 0.5) * 6.5, ey - Math.sin(ang + 0.5) * 6.5);
       ctx.closePath();
-      ctx.fillStyle = '#F2CE74';
       ctx.fill();
     }
-    ctx.restore();
-
     for (const n of nodes) {
       ctx.beginPath();
-      ctx.arc(n.px, n.py, 17, 0, Math.PI * 2);
+      ctx.arc(n.px, n.py, 15.5, 0, Math.PI * 2);
       ctx.fillStyle = '#18120D';
       ctx.fill();
-      ctx.lineWidth = 1.6;
+      ctx.lineWidth = 1.5;
       ctx.strokeStyle = SUITS[n.id].bright;
       ctx.stroke();
-      drawSuitEmblem(ctx, n.id, n.px, n.py, 12);
+      drawSuitEmblem(ctx, n.id, n.px, n.py, 10.5);
     }
-
-    // Center Brass Neutral Ward emblem
     ctx.beginPath();
-    ctx.arc(wCx, wCy + 4, 14, 0, Math.PI * 2);
+    ctx.arc(wCx, wCy + 3, 12.5, 0, Math.PI * 2);
     ctx.fillStyle = '#22170C';
     ctx.fill();
-    ctx.lineWidth = 1.4;
+    ctx.lineWidth = 1.3;
     ctx.strokeStyle = '#FFD459';
     ctx.stroke();
-    drawSuitEmblem(ctx, 'brass', wCx, wCy + 4, 10);
+    drawSuitEmblem(ctx, 'brass', wCx, wCy + 3, 9);
+    label(ctx, 'BRASS: NEUTRAL + WARD', wCx, 474, `700 9.5px ${UI_FONT}`, '#D8C7A4');
 
-    ctx.fillStyle = '#D8C7A4';
-    ctx.font = '700 10px system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('☀ BRASS: NEUTRAL + WARD', wCx, 460);
-
-    // 3. PLAYER MEDALLION PANEL (y = 492..682)
+    // 3. Player Medallion with 3D Brass Lantern Coins
     const pDead = engine.playerHp <= 0;
-    this.drawPanelBox(ctx, x, 492, w, 190, pDead ? '#A34844' : '#E5BE62');
+    this.drawPanelBox(ctx, x, 496, w, 188, pDead ? '#A34844' : '#E5BE62');
+    label(ctx, 'YOU · CHALLENGER', x + 14, 516, `900 12.5px ${UI_FONT}`, '#FFE499', 'left');
+    drawHeartIcon(ctx, x + 27, 549, 11.5, pDead ? '#C84842' : '#4CE28D');
+    const pStr = String(engine.playerHp);
+    label(ctx, pStr, x + 45, 550, '900 32px Georgia, serif', pDead ? '#FF6B60' : '#57E897', 'left');
+    label(ctx, `/${engine.playerMaxHp}`, x + 49 + ctx.measureText(pStr).width, 554, `700 15px ${UI_FONT}`, '#C0B092', 'left');
+    hpBar(ctx, x + 14, 571, w - 28, 10, engine.playerHp / engine.playerMaxHp, '#10241A', '#1FA35E', '#66F09F');
 
-    ctx.fillStyle = '#FFE499';
-    ctx.font = '900 13px system-ui, sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText('YOU · CHALLENGER', x + 16, 514);
+    label(ctx, 'LANTERNS', x + 14, 601, `800 11.5px ${UI_FONT}`, '#F5CF6B', 'left');
+    label(ctx, `${engine.playerLanterns} / ${engine.playerMaxLanterns}`, x + w - 14, 601, `900 14.5px ${UI_FONT}`, '#FFE485', 'right');
+    const maxCoins = Math.max(engine.playerMaxLanterns, 6);
+    const cStep = Math.min(24, (w - 34) / Math.max(1, maxCoins - 1));
+    for (let i = 0; i < maxCoins; i += 1) drawLanternCoin(ctx, x + 21 + i * cStep, 624, 8.2, i < engine.playerLanterns);
 
-    // HUGE Player Life total (exact measured spacing + custom vector heart)
-    drawHeartIcon(ctx, x + 28, 548, 12, pDead ? '#C84842' : '#4CE28D');
-    ctx.fillStyle = pDead ? '#FF6B60' : '#57E897';
-    ctx.font = '900 34px Georgia, serif';
-    const pHpStr = String(engine.playerHp);
-    ctx.fillText(pHpStr, x + 46, 548);
-    const pHpW = ctx.measureText(pHpStr).width;
-    ctx.fillStyle = '#C0B092';
-    ctx.font = '700 15px system-ui, sans-serif';
-    ctx.fillText(`/${engine.playerMaxHp}`, x + 50 + pHpW, 552);
-
-    // Player HP bar
-    roundedRectPath(ctx, barX, 570, barW, 11, 5);
-    ctx.fillStyle = '#10241A';
-    ctx.fill();
-    const pPct = Math.max(0, Math.min(1, engine.playerHp / engine.playerMaxHp));
-    if (pPct > 0) {
-      roundedRectPath(ctx, barX, 570, Math.max(8, barW * pPct), 11, 5);
-      const pg = ctx.createLinearGradient(barX, 570, barX + barW, 570);
-      pg.addColorStop(0, '#1FA35E');
-      pg.addColorStop(1, '#66F09F');
-      ctx.fillStyle = pg;
-      ctx.fill();
-    }
-
-    // Lantern Resource Pool (glowing gold lantern icons + numeral!)
-    ctx.fillStyle = '#F5CF6B';
-    ctx.font = '800 12px system-ui, sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText('LANTERNS', x + 16, 602);
-    ctx.textAlign = 'right';
-    ctx.font = '900 15px system-ui, sans-serif';
-    ctx.fillText(`${engine.playerLanterns} / ${engine.playerMaxLanterns}`, x + w - 16, 602);
-
-    const lanternDisplayMax = Math.max(engine.playerMaxLanterns, 6);
-    const lStep = Math.min(24, (w - 38) / Math.max(1, lanternDisplayMax - 1));
-    for (let i = 0; i < lanternDisplayMax; i += 1) {
-      drawLanternIcon(ctx, x + 22 + i * lStep, 624, 8.5, i < engine.playerLanterns);
-    }
-
-    // Score & Ward footer strip
-    ctx.strokeStyle = 'rgba(227, 188, 100, 0.25)';
+    ctx.strokeStyle = 'rgba(227,188,100,0.25)';
     ctx.beginPath();
-    ctx.moveTo(x + 14, 644);
-    ctx.lineTo(x + w - 14, 644);
+    ctx.moveTo(x + 14, 645);
+    ctx.lineTo(x + w - 14, 645);
     ctx.stroke();
-
-    ctx.fillStyle = '#FFF2CF';
-    ctx.font = '900 15px Georgia, serif';
-    ctx.textAlign = 'left';
-    ctx.fillText(`SCORE ${engine.playerScore}`, x + 16, 664);
-
+    label(ctx, `SCORE ${engine.playerScore}`, x + 14, 665, '900 14.5px Georgia, serif', '#FFF2CF', 'left');
     if (engine.playerWard > 0) {
-      drawShieldIcon(ctx, x + w - 34, 663, 7.5, '#FFD459');
-      ctx.fillStyle = '#FFD459';
-      ctx.font = '800 13px system-ui, sans-serif';
-      ctx.textAlign = 'right';
-      ctx.fillText(String(engine.playerWard), x + w - 14, 664);
+      drawShieldIcon(ctx, x + w - 33, 664, 7.2, '#FFD459');
+      label(ctx, String(engine.playerWard), x + w - 14, 665, `800 13px ${UI_FONT}`, '#FFD459', 'right');
     }
   }
 
@@ -356,150 +227,57 @@ export class HudRenderer {
     const x = 1034;
     const w = 210;
 
-    // 1. TOP ROUND & UTILITY BAR (y = 38..94) — generous clearance before buttons
-    this.drawPanelBox(ctx, x, 38, w, 56, 'rgba(227, 188, 100, 0.55)');
-    ctx.fillStyle = '#FFE496';
-    ctx.font = '900 14px Georgia, serif';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`ROUND ${engine.round}/${MAX_ROUNDS}`, x + 12, 57);
+    this.drawPanelBox(ctx, x, 36, w, 56, 'rgba(227,188,100,0.55)');
+    label(ctx, `ROUND ${engine.round}/${MAX_ROUNDS}`, x + 12, 55, '900 14px Georgia, serif', '#FFE496', 'left');
+    label(ctx, `RIVAL ${engine.rivalIndex + 1} OF 3`, x + 12, 74, `700 10.5px ${UI_FONT}`, '#C8B99B', 'left');
+    this.drawButton(ctx, 'btn-mute', x + 122, 47, 26, 32, '', { radius: 7 }, null, uiState.hoveredButtonId);
+    drawSpeakerIcon(ctx, x + 135, 63, 8.5, sound.muted);
+    this.drawButton(ctx, 'btn-rules', x + 151, 47, 24, 32, '?', { fontSize: 14, radius: 7 }, null, uiState.hoveredButtonId);
+    this.drawButton(ctx, 'btn-reset', x + 178, 47, 24, 32, '↺', { fontSize: 15, radius: 7 }, null, uiState.hoveredButtonId);
 
-    ctx.fillStyle = '#C8B99B';
-    ctx.font = '700 10.5px system-ui, sans-serif';
-    ctx.fillText(`RIVAL ${engine.rivalIndex + 1} OF 3`, x + 12, 76);
-
-    // Compact interactive utility buttons: custom vector Mute, Rules, Restart
-    this.drawButton(ctx, 'btn-mute', x + 122, 49, 26, 32, '', { radius: 7 }, null, uiState.hoveredButtonId);
-    drawSpeakerIcon(ctx, x + 135, 65, 8.5, sound.muted);
-    this.drawButton(ctx, 'btn-rules', x + 151, 49, 24, 32, '?', { fontSize: 14, radius: 7 }, null, uiState.hoveredButtonId);
-    this.drawButton(ctx, 'btn-reset', x + 178, 49, 24, 32, '↺', { fontSize: 15, radius: 7 }, null, uiState.hoveredButtonId);
-
-    // 2. COMBO SYNERGY GUIDE (y = 108..366) — highlights live active combo!
-    this.drawPanelBox(ctx, x, 108, w, 258, 'rgba(227, 188, 100, 0.52)');
-    ctx.fillStyle = '#F2CE74';
-    ctx.font = '900 12px system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('COMBO SYNERGIES', x + w / 2, 128);
-
-    const activeComboId = engine.phase === PHASES.CLASH
-      ? engine.lastClash?.playerTrick?.comboId
-      : engine.getSelectedTrick().comboId;
-
+    this.drawPanelBox(ctx, x, 106, w, 258, 'rgba(227,188,100,0.52)');
+    label(ctx, 'COMBO SYNERGIES', x + w / 2, 126, `900 12px ${UI_FONT}`, '#F2CE74');
+    const activeCombo = engine.phase === PHASES.CLASH ? engine.lastClash?.playerTrick?.comboId : engine.getSelectedTrick().comboId;
     for (let i = 0; i < COMBO_CATALOG.length; i += 1) {
-      const item = COMBO_CATALOG[i];
-      const ry = 146 + i * 44;
-      const active = activeComboId === item.id;
-
-      roundedRectPath(ctx, x + 12, ry, w - 24, 38, 8);
-      ctx.fillStyle = active ? 'rgba(236, 182, 48, 0.25)' : 'rgba(255, 248, 226, 0.05)';
-      ctx.fill();
-      ctx.lineWidth = active ? 2 : 1;
-      ctx.strokeStyle = active ? '#FFE066' : 'rgba(227, 188, 100, 0.22)';
-      ctx.stroke();
-
-      ctx.fillStyle = active ? '#FFF5C2' : item.color;
-      ctx.font = '900 13px system-ui, sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText(item.name, x + 22, ry + 13);
-
-      ctx.fillStyle = active ? '#FDEBA4' : '#B9AA8F';
-      ctx.font = '600 11px system-ui, sans-serif';
-      ctx.fillText(item.desc, x + 22, ry + 28);
-
-      ctx.fillStyle = active ? '#FFE270' : '#F3D27A';
-      ctx.font = '900 14px Georgia, serif';
-      ctx.textAlign = 'right';
-      ctx.fillText(item.bonus, x + w - 20, ry + 20);
+      const it = COMBO_CATALOG[i];
+      const ry = 144 + i * 44;
+      const act = activeCombo === it.id;
+      box(ctx, x + 12, ry, w - 24, 38, 8, act ? 'rgba(236,182,48,0.26)' : 'rgba(255,248,226,0.05)', act ? '#FFE066' : 'rgba(227,188,100,0.22)', act ? 2 : 1);
+      label(ctx, it.name, x + 22, ry + 13, `900 13px ${UI_FONT}`, act ? '#FFF5C2' : it.color, 'left');
+      label(ctx, it.desc, x + 22, ry + 28, `600 11px ${UI_FONT}`, act ? '#FDEBA4' : '#B9AA8F', 'left');
+      label(ctx, it.bonus, x + w - 20, ry + 20, '900 14px Georgia, serif', act ? '#FFE270' : '#F3D27A', 'right');
     }
+    box(ctx, x + 12, 324, w - 24, 28, 7, 'rgba(198,136,22,0.2)', 'rgba(255,212,89,0.45)', 1);
+    label(ctx, 'BRASS COMBO: +2 WARD · +1✦', x + w / 2, 338.5, `800 10.5px ${UI_FONT}`, '#FFE48E');
 
-    // Brass Harmonic Synergy footer
-    roundedRectPath(ctx, x + 12, 326, w - 24, 28, 7);
-    ctx.fillStyle = 'rgba(198, 136, 22, 0.2)';
-    ctx.fill();
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = 'rgba(255, 212, 89, 0.45)';
-    ctx.stroke();
-    ctx.fillStyle = '#FFE48E';
-    ctx.font = '800 10.5px system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('BRASS COMBO: +2 WARD · +1✦', x + w / 2, 340.5);
-
-    // 3. TRICK CHRONICLE (y = 382..682)
-    this.drawPanelBox(ctx, x, 382, w, 300, 'rgba(227, 188, 100, 0.48)');
-    ctx.fillStyle = '#F2CE74';
-    ctx.font = '900 12px system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('TRICK CHRONICLE', x + w / 2, 402);
-
+    this.drawPanelBox(ctx, x, 380, w, 304, 'rgba(227,188,100,0.48)');
+    label(ctx, 'TRICK CHRONICLE', x + w / 2, 400, `900 12px ${UI_FONT}`, '#F2CE74');
     if (engine.chronicle.length === 0) {
-      ctx.fillStyle = '#9C8E75';
-      ctx.font = '600 12px system-ui, sans-serif';
-      ctx.fillText('Read the Rival Tell,', x + w / 2, 456);
-      ctx.fillText('select 1–3 cards,', x + w / 2, 476);
-      ctx.fillText('and press PLAY TRICK.', x + w / 2, 496);
+      label(ctx, 'Read the Rival Tell,', x + w / 2, 456, `600 12px ${UI_FONT}`, '#9C8E75');
+      label(ctx, 'select 1–3 cards,', x + w / 2, 476, `600 12px ${UI_FONT}`, '#9C8E75');
+      label(ctx, 'and press PLAY TRICK.', x + w / 2, 496, `600 12px ${UI_FONT}`, '#9C8E75');
     } else {
       const shown = engine.chronicle.slice(0, 4);
       for (let i = 0; i < shown.length; i += 1) {
-        const entry = shown[i];
-        const cy = 420 + i * 56;
-        roundedRectPath(ctx, x + 12, cy, w - 24, 50, 9);
-        const bg =
-          entry.winner === 'player'
-            ? 'rgba(30, 122, 74, 0.24)'
-            : entry.winner === 'opponent'
-              ? 'rgba(180, 48, 42, 0.24)'
-              : 'rgba(140, 118, 72, 0.2)';
-        ctx.fillStyle = bg;
-        ctx.fill();
-        ctx.lineWidth = 1.1;
-        ctx.strokeStyle =
-          entry.winner === 'player'
-            ? 'rgba(84, 224, 140, 0.5)'
-            : entry.winner === 'opponent'
-              ? 'rgba(255, 104, 92, 0.5)'
-              : 'rgba(224, 190, 106, 0.4)';
-        ctx.stroke();
-
-        // Top row: Round + Result + Score clash
-        ctx.fillStyle = '#E8D9B8';
-        ctx.font = '800 11px system-ui, sans-serif';
-        ctx.textAlign = 'left';
-        ctx.fillText(`R${entry.round}`, x + 20, cy + 16);
-
-        ctx.fillStyle = entry.winner === 'player' ? '#6BF09E' : entry.winner === 'opponent' ? '#FF8072' : '#FFE084';
-        ctx.font = '900 11px system-ui, sans-serif';
-        ctx.fillText(
-          entry.winner === 'player' ? `WIN (-${entry.damage}♥)` : entry.winner === 'opponent' ? `LOSS (-${entry.damage}♥)` : entry.winner === 'cycle' ? 'CYCLED' : 'TIE',
-          x + 44,
-          cy + 16,
+        const e = shown[i];
+        const cy = 418 + i * 57;
+        const fill = e.winner === 'player' ? 'rgba(30,122,74,0.24)' : e.winner === 'opponent' ? 'rgba(180,48,42,0.24)' : 'rgba(140,118,72,0.2)';
+        const brd = e.winner === 'player' ? 'rgba(84,224,140,0.5)' : e.winner === 'opponent' ? 'rgba(255,104,92,0.5)' : 'rgba(224,190,106,0.4)';
+        box(ctx, x + 12, cy, w - 24, 50, 9, fill, brd, 1.1);
+        label(ctx, `R${e.round}`, x + 20, cy + 16, `800 11px ${UI_FONT}`, '#E8D9B8', 'left');
+        label(
+          ctx,
+          e.winner === 'player' ? `WIN (-${e.damage})` : e.winner === 'opponent' ? `LOSS (-${e.damage})` : e.winner === 'cycle' ? 'KINDLED' : 'TIE',
+          x + 44, cy + 16, `900 11px ${UI_FONT}`,
+          e.winner === 'player' ? '#6BF09E' : e.winner === 'opponent' ? '#FF8072' : '#FFE084', 'left',
         );
-
-        ctx.fillStyle = '#FFF2CF';
-        ctx.font = '900 12px Georgia, serif';
-        ctx.textAlign = 'right';
-        ctx.fillText(`${entry.playerPower}v${entry.oppPower}`, x + w - 20, cy + 16);
-
-        // Bottom row: Combo & Suit icon
-        if (entry.playerSuit) drawSuitEmblem(ctx, entry.playerSuit, x + 25, cy + 36, 7);
-        ctx.fillStyle = '#CFC1A5';
-        ctx.font = '700 10.5px system-ui, sans-serif';
-        ctx.textAlign = 'left';
-        ctx.fillText(entry.playerCombo, x + 38, cy + 36.5);
-
-        if (entry.counterBreak || entry.trumped) {
-          ctx.fillStyle = '#FFE066';
-          ctx.font = '800 10px system-ui, sans-serif';
-          ctx.textAlign = 'right';
-          ctx.fillText(entry.counterBreak ? 'BREAK!' : 'TRUMP', x + w - 20, cy + 36.5);
-        }
+        label(ctx, `${e.playerPower}v${e.oppPower}`, x + w - 20, cy + 16, '900 12px Georgia, serif', '#FFF2CF', 'right');
+        if (e.playerSuit) drawSuitEmblem(ctx, e.playerSuit, x + 25, cy + 36, 7);
+        label(ctx, e.playerCombo, x + 38, cy + 36.5, `700 10.5px ${UI_FONT}`, '#CFC1A5', 'left');
+        if (e.counterBreak || e.trumped) label(ctx, e.counterBreak ? 'BREAK!' : 'TRUMP', x + w - 20, cy + 36.5, `800 10px ${UI_FONT}`, '#FFE066', 'right');
       }
     }
-
-    // Subtle keyboard control legend at bottom of chronicle panel
-    ctx.fillStyle = '#9C8D73';
-    ctx.font = '700 10px system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('[1-5] Select · [Space] Play · [C] Cycle', x + w / 2, 666);
+    label(ctx, '[1-5] Select · [Space] Play · [C] Kindle', x + w / 2, 668, `700 9.8px ${UI_FONT}`, '#9C8D73');
   }
 
   drawCenterActionBar(ctx, engine, uiState) {
@@ -509,373 +287,177 @@ export class HudRenderer {
     const trick = engine.getSelectedTrick();
     const canPlay = engine.canPlaySelected();
 
-    // Left Live Status / Combo Preview Pill
-    const pillX = 256;
-    const pillW = 434;
-    roundedRectPath(ctx, pillX, barY, pillW, barH, 11);
-    ctx.fillStyle = 'rgba(18, 14, 10, 0.9)';
-    ctx.fill();
-    ctx.lineWidth = 1.6;
-    ctx.strokeStyle = isClash
-      ? '#FFE066'
-      : canPlay
-        ? '#E6BE62'
-        : 'rgba(227, 188, 100, 0.4)';
-    ctx.stroke();
-
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-
+    box(ctx, 256, barY, 430, barH, 11, 'rgba(18,14,10,0.92)', isClash ? '#FFE066' : canPlay ? '#E6BE62' : 'rgba(227,188,100,0.4)', 1.6);
     if (isClash && engine.lastClash) {
-      ctx.fillStyle = engine.lastClash.winner === 'player' ? '#72F2A5' : engine.lastClash.winner === 'opponent' ? '#FF877A' : '#FFE38A';
-      ctx.font = '900 14px system-ui, sans-serif';
-      ctx.fillText(engine.lastClash.headline, pillX + 16, barY + barH / 2 + 0.5);
+      label(ctx, engine.lastClash.headline, 272, barY + 21.5, `900 13.5px ${UI_FONT}`, engine.lastClash.winner === 'player' ? '#72F2A5' : engine.lastClash.winner === 'opponent' ? '#FF877A' : '#FFE38A', 'left');
     } else if (uiState.toastMessage && uiState.toastTimer > 0) {
-      ctx.fillStyle = '#FF9C84';
-      ctx.font = '800 13px system-ui, sans-serif';
-      ctx.fillText(`! ${uiState.toastMessage}`, pillX + 16, barY + barH / 2 + 0.5);
+      label(ctx, `! ${uiState.toastMessage}`, 272, barY + 21.5, `800 13px ${UI_FONT}`, '#FF9C84', 'left');
     } else if (trick.cards.length > 0) {
-      const oppSuit = engine.oppTelegraph?.leadSuit;
-      const trumps = doesSuitTrump(trick.leadSuit, oppSuit);
-      const effPower = trick.totalPower + (trumps ? 3 : 0);
-      if (trick.leadSuit) drawSuitEmblem(ctx, trick.leadSuit, pillX + 24, barY + barH / 2, 11);
-      ctx.fillStyle = '#FFF4D4';
-      ctx.font = '900 13.5px system-ui, sans-serif';
-      const label = `${trick.comboName} · PWR ${effPower}${trumps ? ' (TRUMP +3)' : ''} · ${trick.totalCost}✦`;
-      ctx.fillText(label, pillX + 44, barY + barH / 2 + 0.5);
+      const trumps = doesSuitTrump(trick.leadSuit, engine.oppTelegraph?.leadSuit);
+      const eff = trick.totalPower + (trumps ? 3 : 0);
+      if (trick.leadSuit) drawSuitEmblem(ctx, trick.leadSuit, 280, barY + 21, 11);
+      label(ctx, `${trick.comboName} · PWR ${eff}${trumps ? ' (TRUMP +3)' : ''} · ${trick.totalCost}✦`, 300, barY + 21.5, `900 13.5px ${UI_FONT}`, '#FFF4D4', 'left');
     } else {
-      ctx.fillStyle = '#D2C19E';
-      ctx.font = '700 13px system-ui, sans-serif';
-      ctx.fillText('Pick 1–3 cards to counter the Rival Tell (or Cycle for +2✦)', pillX + 16, barY + barH / 2 + 0.5);
+      label(ctx, 'Pick 1–3 cards to counter the Rival Tell (or Kindle +2✦)', 272, barY + 21.5, `700 12.8px ${UI_FONT}`, '#D2C19E', 'left');
     }
 
-    // Right Action Buttons
     if (isClash) {
-      this.drawButton(ctx, 'btn-continue', 706, barY, 298, barH, 'NEXT ROUND  [SPACE]', { primary: true, fontSize: 14 }, null, uiState.hoveredButtonId);
+      this.drawButton(ctx, 'btn-continue', 702, barY, 302, barH, 'NEXT ROUND  [SPACE]', { primary: true, fontSize: 14 }, null, uiState.hoveredButtonId);
     } else {
-      this.drawButton(
-        ctx,
-        'btn-play',
-        704,
-        barY,
-        166,
-        barH,
-        canPlay ? 'PLAY TRICK  ▸' : 'PLAY TRICK',
-        { primary: canPlay, disabled: !canPlay, fontSize: 14 },
-        null,
-        uiState.hoveredButtonId,
-      );
-      this.drawButton(
-        ctx,
-        'btn-cycle',
-        880,
-        barY,
-        124,
-        barH,
-        'CYCLE +2✦',
-        { fontSize: 13 },
-        null,
-        uiState.hoveredButtonId,
-      );
+      this.drawButton(ctx, 'btn-play', 700, barY, 166, barH, canPlay ? 'PLAY TRICK  ▸' : 'PLAY TRICK', { primary: canPlay, disabled: !canPlay, fontSize: 14 }, null, uiState.hoveredButtonId);
+      this.drawButton(ctx, 'btn-cycle', 876, barY, 128, barH, 'KINDLE +2✦', { fontSize: 13 }, null, uiState.hoveredButtonId);
     }
   }
 
   drawTitleScreen(ctx, engine, anim, sound, uiState) {
-    // Top-right custom vector audio & rules buttons
     this.drawButton(ctx, 'btn-mute', 1140, 42, 42, 36, '', { radius: 8 }, null, uiState.hoveredButtonId);
     drawSpeakerIcon(ctx, 1161, 60, 10, sound.muted);
     this.drawButton(ctx, 'btn-rules', 1190, 42, 46, 36, '?', { fontSize: 16, radius: 8 }, null, uiState.hoveredButtonId);
 
-    // 1. Upper-Center Ornate Title Crest Panel (y = 34..348)
-    const panelW = 790;
+    const panelW = 816;
     const panelX = CENTER_X - panelW / 2;
-    const panelY = 34;
-    const panelH = 314;
-    this.drawPanelBox(ctx, panelX, panelY, panelW, panelH, '#E6BF64', 'rgba(26, 17, 11, 0.9)', 'rgba(13, 24, 19, 0.92)');
+    const panelY = 32;
+    this.drawPanelBox(ctx, panelX, panelY, panelW, 318, '#E8C266', 'rgba(26,17,11,0.92)', 'rgba(12,24,19,0.93)');
 
-    // Lit decorative brass lantern crown at top center
-    drawLanternIcon(ctx, CENTER_X, panelY + 30, 16, true);
-
-    // Grand embossed title typography
-    ctx.save();
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.font = '900 58px Georgia, "Times New Roman", serif';
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
-    ctx.fillText('LANTERN TRICK', CENTER_X + 3, panelY + 82 + 3);
-
-    const titleGrad = ctx.createLinearGradient(CENTER_X, panelY + 48, CENTER_X, panelY + 110);
-    titleGrad.addColorStop(0, '#FFF6C8');
-    titleGrad.addColorStop(0.5, '#F5CB5C');
-    titleGrad.addColorStop(1, '#BA7F19');
-    ctx.fillStyle = titleGrad;
-    ctx.fillText('LANTERN TRICK', CENTER_X, panelY + 82);
-
-    ctx.fillStyle = '#E5D5B2';
-    ctx.font = '800 14px system-ui, -apple-system, sans-serif';
-    ctx.fillText('TACTICAL CANDLELIT PARLOR TRICK-COMBO DUEL', CENTER_X, panelY + 120);
-    ctx.restore();
-
-    // 3-Rival Gauntlet Selector Cards inside Title Crest
-    const cardW = 226;
-    const cardH = 80;
-    const gap = 18;
-    const rowStartX = CENTER_X - (cardW * 3 + gap * 2) / 2;
-    const rowY = panelY + 144;
-
-    for (let i = 0; i < RIVALS.length; i += 1) {
-      const rival = RIVALS[i];
-      const rx = rowStartX + i * (cardW + gap);
-      const selected = engine.rivalIndex === i;
-      const btnId = `rival-${i}`;
-      const hovered = uiState.hoveredButtonId === btnId;
-      this.registerButton(btnId, rx, rowY, cardW, cardH, i);
-
-      roundedRectPath(ctx, rx, rowY, cardW, cardH, 10);
-      ctx.fillStyle = selected ? 'rgba(242, 198, 84, 0.2)' : hovered ? 'rgba(255, 240, 200, 0.09)' : 'rgba(12, 18, 15, 0.72)';
-      ctx.fill();
-      ctx.lineWidth = selected ? 2.4 : 1.3;
-      ctx.strokeStyle = selected ? '#FFE06E' : hovered ? '#E2BD64' : 'rgba(227, 188, 100, 0.35)';
-      ctx.stroke();
-
-      drawSuitEmblem(ctx, rival.favSuit, rx + 26, rowY + 30, 14);
-
-      ctx.fillStyle = selected ? '#FFF8DF' : '#E7D8B6';
-      ctx.font = '900 15px Georgia, serif';
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(`${rival.name} · ${rival.maxHp} HP`, rx + 48, rowY + 22);
-
-      ctx.fillStyle = rival.accent;
-      ctx.font = '800 10.5px system-ui, sans-serif';
-      ctx.fillText(`${rival.difficulty.toUpperCase()} · ${rival.badge}`, rx + 48, rowY + 40);
-
-      ctx.fillStyle = '#BBA98A';
-      ctx.font = '600 10.5px system-ui, sans-serif';
-      ctx.fillText(rival.title, rx + 48, rowY + 60);
-    }
-
-    // Primary PLAY MATCH CTA + HOW TO PLAY button
-    this.drawButton(ctx, 'btn-start', CENTER_X - 186, panelY + 244, 234, 50, 'PLAY MATCH  ▸', { primary: true, fontSize: 18, radius: 12 }, null, uiState.hoveredButtonId);
-    this.drawButton(ctx, 'btn-rules-title', CENTER_X + 64, panelY + 244, 130, 50, 'RULES  [?]', { fontSize: 14, radius: 12 }, null, uiState.hoveredButtonId);
-
-    // Warm golden candle spotlight softly illuminating the 4 hero cards below
-    ctx.save();
-    const heroGlow = ctx.createRadialGradient(CENTER_X, 504, 20, CENTER_X, 504, 340);
-    heroGlow.addColorStop(0, 'rgba(255, 215, 115, 0.24)');
-    heroGlow.addColorStop(1, 'rgba(255, 190, 80, 0)');
-    ctx.fillStyle = heroGlow;
-    ctx.beginPath();
-    ctx.ellipse(CENTER_X, 504, 380, 128, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-
-    // 2. Lower-Center HEROIC 4-SUIT SHOWCASE FAN (All 4 color+shape suits HUGE & crystal clear!)
-    const fanStride = 166;
-    const fanStartX = CENTER_X - (fanStride * 3) / 2;
-    for (let i = 0; i < SHOWCASE_CARDS.length; i += 1) {
-      const card = SHOWCASE_CARDS[i];
-      const norm = (i / 3) * 2 - 1;
-      const bob = Math.sin(anim.time * 2.1 + i * 1.1) * 3;
-      const cx = fanStartX + i * fanStride;
-      const cy = 496 + norm * norm * 14 + bob;
-      drawCard(ctx, card, cx, cy, 134, 192, {
-        rot: norm * 0.075,
-        scale: 1,
-        flip: 1,
-        selected: i === 3,
-      });
-    }
-
-    // Bottom crisp rules pill along lower edge (generous gap below showcase cards!)
-    roundedRectPath(ctx, CENTER_X - 385, 646, 770, 34, 17);
-    ctx.fillStyle = 'rgba(15, 11, 8, 0.9)';
-    ctx.fill();
+    drawLanternIcon(ctx, CENTER_X, panelY + 28, 16, true);
+    ctx.strokeStyle = 'rgba(240,202,108,0.45)';
     ctx.lineWidth = 1.4;
-    ctx.strokeStyle = 'rgba(227, 188, 100, 0.52)';
+    ctx.beginPath();
+    ctx.moveTo(CENTER_X - 180, panelY + 28); ctx.lineTo(CENTER_X - 30, panelY + 28);
+    ctx.moveTo(CENTER_X + 30, panelY + 28); ctx.lineTo(CENTER_X + 180, panelY + 28);
     ctx.stroke();
 
-    ctx.fillStyle = '#F2DEA8';
-    ctx.font = '800 12.5px system-ui, -apple-system, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('4 SUITS:  EMBER > BRAMBLE > TIDE > EMBER  ·  BRASS WARDS  ·  COMBOS: PAIR · HARMONY · CHAIN · PRISM', CENTER_X, 663.5);
-  }
+    label(ctx, 'LANTERN TRICK', CENTER_X + 3, panelY + 83, '900 58px Georgia, serif', 'rgba(0,0,0,0.68)');
+    const tg = ctx.createLinearGradient(CENTER_X, panelY + 46, CENTER_X, panelY + 108);
+    tg.addColorStop(0, '#FFF8D4'); tg.addColorStop(0.5, '#F5CB5C'); tg.addColorStop(1, '#BA7F19');
+    label(ctx, 'LANTERN TRICK', CENTER_X, panelY + 80, '900 58px Georgia, serif', tg);
+    label(ctx, 'HEIRLOOM CANDLELIT PARLOR TRICK-COMBO DUEL', CENTER_X, panelY + 118, `800 13.5px ${UI_FONT}`, '#E7D7B4');
 
-  drawVictoryBanner(ctx, engine, uiState) {
-    const bw = 724;
-    const bh = 318;
-    const bx = CENTER_X - bw / 2;
-    const by = 48;
-
-    this.drawPanelBox(ctx, bx, by, bw, bh, '#FFE06E', 'rgba(34, 24, 11, 0.93)', 'rgba(16, 30, 22, 0.94)');
-
-    // Gold top lantern crown
-    drawLanternIcon(ctx, CENTER_X, by + 30, 15, true);
-
-    // Big embossed VICTORY! header
-    ctx.save();
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.font = '900 58px Georgia, serif';
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-    ctx.fillText('VICTORY!', CENTER_X + 3, by + 84 + 3);
-
-    const vg = ctx.createLinearGradient(CENTER_X, by + 50, CENTER_X, by + 114);
-    vg.addColorStop(0, '#FFF9D6');
-    vg.addColorStop(0.5, '#FFD95A');
-    vg.addColorStop(1, '#C78615');
-    ctx.fillStyle = vg;
-    ctx.fillText('VICTORY!', CENTER_X, by + 84);
-
-    ctx.fillStyle = '#F0DFB6';
-    ctx.font = '800 14px system-ui, sans-serif';
-    ctx.fillText(`${engine.rival.name.toUpperCase()} ${engine.rival.title.toUpperCase()} DEFEATED · ROUND ${engine.round}`, CENTER_X, by + 124);
-    ctx.restore();
-
-    // 3 High-Contrast Summary Stat Boxes
-    const stats = [
-      { label: 'YOUR LIFE', value: `${engine.playerHp} / ${engine.playerMaxHp}`, accent: '#6BF09E' },
-      { label: 'GLORY SCORE', value: String(engine.playerScore), accent: '#FFE06E' },
-      { label: 'COMBOS · TRUMPS', value: `${engine.matchStats.combosLanded} · ${engine.matchStats.trumpsLanded}`, accent: '#66C2FF' },
-    ];
-    const sw = 204;
-    const sh = 66;
-    const sGap = 18;
-    const sx0 = CENTER_X - (sw * 3 + sGap * 2) / 2;
-    for (let i = 0; i < stats.length; i += 1) {
-      const st = stats[i];
-      const sx = sx0 + i * (sw + sGap);
-      roundedRectPath(ctx, sx, by + 150, sw, sh, 10);
-      ctx.fillStyle = 'rgba(11, 20, 15, 0.78)';
-      ctx.fill();
-      ctx.lineWidth = 1.4;
-      ctx.strokeStyle = 'rgba(236, 198, 108, 0.45)';
-      ctx.stroke();
-
-      ctx.fillStyle = '#C4B38F';
-      ctx.font = '800 11px system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(st.label, sx + sw / 2, by + 170);
-
-      ctx.fillStyle = st.accent;
-      ctx.font = '900 24px Georgia, serif';
-      ctx.fillText(st.value, sx + sw / 2, by + 198);
+    const cardW = 242;
+    const rowX = CENTER_X - (cardW * 3 + 32) / 2;
+    const rowY = panelY + 142;
+    for (let i = 0; i < RIVALS.length; i += 1) {
+      const r = RIVALS[i];
+      const rx = rowX + i * (cardW + 16);
+      const sel = engine.rivalIndex === i;
+      const id = `rival-${i}`;
+      const hov = uiState.hoveredButtonId === id;
+      this.registerButton(id, rx, rowY, cardW, 84, i);
+      box(ctx, rx, rowY, cardW, 84, 10, sel ? 'rgba(242,198,84,0.22)' : hov ? 'rgba(255,240,200,0.09)' : 'rgba(12,18,15,0.74)', sel ? '#FFE06E' : hov ? '#E2BD64' : 'rgba(227,188,100,0.36)', sel ? 2.4 : 1.3);
+      drawRivalPortrait(ctx, r.id, rx + 31, rowY + 42, 22);
+      label(ctx, `${r.name} · ${r.maxHp} HP`, rx + 62, rowY + 21, '900 14.5px Georgia, serif', sel ? '#FFF8DF' : '#E7D8B6', 'left');
+      label(ctx, `${r.difficulty.toUpperCase()} · ${r.badge}`, rx + 62, rowY + 40, `800 10px ${UI_FONT}`, r.accent, 'left');
+      label(ctx, `Relic: ${r.relicName}`, rx + 62, rowY + 61, `700 10.5px ${UI_FONT}`, '#D8C79F', 'left');
     }
 
-    // Action buttons
-    const nextRival = RIVALS[(engine.rivalIndex + 1) % RIVALS.length];
-    this.drawButton(ctx, 'btn-next-rival', CENTER_X - 246, by + 240, 224, 52, `NEXT: ${nextRival.name.toUpperCase()}  ▸`, { primary: true, fontSize: 15, radius: 11 }, null, uiState.hoveredButtonId);
-    this.drawButton(ctx, 'btn-rematch', CENTER_X - 6, by + 240, 146, 52, 'REMATCH [R]', { fontSize: 14, radius: 11 }, null, uiState.hoveredButtonId);
-    this.drawButton(ctx, 'btn-title', CENTER_X + 154, by + 240, 96, 52, 'TITLE', { fontSize: 14, radius: 11 }, null, uiState.hoveredButtonId);
+    this.drawButton(ctx, 'btn-start', CENTER_X - 186, panelY + 246, 234, 50, 'PLAY MATCH  ▸', { primary: true, fontSize: 18, radius: 12 }, null, uiState.hoveredButtonId);
+    this.drawButton(ctx, 'btn-rules-title', CENTER_X + 64, panelY + 246, 130, 50, 'RULES  [?]', { fontSize: 14, radius: 12 }, null, uiState.hoveredButtonId);
+
+    const hg = ctx.createRadialGradient(CENTER_X, 504, 24, CENTER_X, 504, 350);
+    hg.addColorStop(0, 'rgba(255,215,115,0.26)');
+    hg.addColorStop(1, 'rgba(255,190,80,0)');
+    ctx.fillStyle = hg;
+    ctx.beginPath();
+    ctx.ellipse(CENTER_X, 504, 390, 128, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    const fanStart = CENTER_X - (168 * 3) / 2;
+    for (let i = 0; i < SHOWCASE_CARDS.length; i += 1) {
+      const norm = (i / 3) * 2 - 1;
+      drawCard(ctx, SHOWCASE_CARDS[i], fanStart + i * 168, 496 + norm * norm * 14 + Math.sin(anim.time * 2.1 + i * 1.1) * 3, 136, 194, { rot: norm * 0.072, scale: 1, flip: 1, selected: i === 3 });
+    }
+
+    box(ctx, CENTER_X - 395, 646, 790, 34, 17, 'rgba(15,11,8,0.9)', 'rgba(227,188,100,0.52)', 1.4);
+    label(ctx, '4 SUITS:  EMBER > BRAMBLE > TIDE > EMBER  ·  BRASS WARDS  ·  COMBOS: PAIR · HARMONY · CHAIN · PRISM', CENTER_X, 663.5, `800 12.2px ${UI_FONT}`, '#F2DEA8');
   }
 
-  drawDefeatBanner(ctx, engine, uiState) {
+  drawOutcomeBanner(ctx, engine, anim, uiState, isWin) {
     const bw = 724;
-    const bh = 318;
     const bx = CENTER_X - bw / 2;
-    const by = 48;
+    const by = 38;
+    this.drawPanelBox(
+      ctx, bx, by, bw, 330,
+      isWin ? '#FFE06E' : '#DC5B54',
+      isWin ? 'rgba(34,24,11,0.93)' : 'rgba(24,21,31,0.95)',
+      isWin ? 'rgba(15,30,22,0.95)' : 'rgba(14,15,24,0.96)',
+    );
 
-    this.drawPanelBox(ctx, bx, by, bw, bh, '#DC5B54', 'rgba(24, 21, 31, 0.94)', 'rgba(15, 16, 25, 0.95)');
+    drawParlorCandle(ctx, bx + 66, by + (isWin ? 86 : 92), 0.9, anim.time, !isWin);
+    drawParlorCandle(ctx, bx + bw - 66, by + (isWin ? 86 : 92), 0.9, anim.time + 1.1, !isWin);
+    drawLanternIcon(ctx, CENTER_X, by + 26, 14, isWin);
 
-    // Snuffed lantern emblem at top
-    drawLanternIcon(ctx, CENTER_X, by + 30, 15, false);
+    const headText = isWin ? 'VICTORY!' : 'DEFEAT';
+    label(ctx, headText, CENTER_X + 3, by + 76, '900 52px Georgia, serif', 'rgba(0,0,0,0.68)');
+    const g = ctx.createLinearGradient(CENTER_X, by + 46, CENTER_X, by + 104);
+    if (isWin) { g.addColorStop(0, '#FFF9D6'); g.addColorStop(0.5, '#FFD95A'); g.addColorStop(1, '#C78615'); }
+    else { g.addColorStop(0, '#F5E8E8'); g.addColorStop(0.55, '#E8958E'); g.addColorStop(1, '#B8433E'); }
+    label(ctx, headText, CENTER_X, by + 74, '900 52px Georgia, serif', g);
 
-    // Big bold DEFEAT header (cool slate-silver & crimson)
-    ctx.save();
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.font = '900 56px Georgia, serif';
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.72)';
-    ctx.fillText('DEFEAT', CENTER_X + 3, by + 84 + 3);
+    const sub = isWin
+      ? `${engine.rival.name.toUpperCase()} ${engine.rival.title.toUpperCase()} DEFEATED · ROUND ${engine.round}`
+      : `OUTPLAYED BY ${engine.rival.name.toUpperCase()} ${engine.rival.title.toUpperCase()} · ROUND ${engine.round}`;
+    label(ctx, sub, CENTER_X, by + 114, `800 13.5px ${UI_FONT}`, isWin ? '#F2E2BC' : '#DBD2E0');
 
-    const dg = ctx.createLinearGradient(CENTER_X, by + 50, CENTER_X, by + 114);
-    dg.addColorStop(0, '#F5E8E8');
-    dg.addColorStop(0.55, '#E8958E');
-    dg.addColorStop(1, '#B8433E');
-    ctx.fillStyle = dg;
-    ctx.fillText('DEFEAT', CENTER_X, by + 84);
-
-    ctx.fillStyle = '#D1C7D6';
-    ctx.font = '800 14px system-ui, sans-serif';
-    ctx.fillText(`OUTPLAYED BY ${engine.rival.name.toUpperCase()} ${engine.rival.title.toUpperCase()} · ROUND ${engine.round}`, CENTER_X, by + 124);
-    ctx.restore();
-
-    // 3 Fair Breakdown Stat Boxes
     const c = engine.lastClash;
-    const stats = [
-      { label: 'YOUR LIFE', value: `${engine.playerHp} / ${engine.playerMaxHp}`, accent: '#FF7066' },
-      { label: `${engine.rival.name.toUpperCase()} LIFE`, value: `${engine.oppHp} / ${engine.oppMaxHp}`, accent: '#F2CA6B' },
-      { label: 'COUNTERED BY', value: c ? c.oppTrick.comboShort : 'OUTLASTED', accent: '#E8A49E' },
-    ];
-    const sw = 204;
-    const sh = 66;
-    const sGap = 18;
-    const sx0 = CENTER_X - (sw * 3 + sGap * 2) / 2;
-    for (let i = 0; i < stats.length; i += 1) {
-      const st = stats[i];
-      const sx = sx0 + i * (sw + sGap);
-      roundedRectPath(ctx, sx, by + 150, sw, sh, 10);
-      ctx.fillStyle = 'rgba(13, 14, 23, 0.84)';
-      ctx.fill();
-      ctx.lineWidth = 1.4;
-      ctx.strokeStyle = 'rgba(214, 104, 98, 0.45)';
-      ctx.stroke();
+    const stats = isWin
+      ? [
+          { k: 'YOUR LIFE', v: `${engine.playerHp} / ${engine.playerMaxHp}`, col: '#6BF09E' },
+          { k: 'GLORY SCORE', v: String(engine.playerScore), col: '#FFE06E' },
+          { k: 'COMBOS · TRUMPS', v: `${engine.matchStats.combosLanded} · ${engine.matchStats.trumpsLanded}`, col: '#66C2FF' },
+        ]
+      : [
+          { k: 'YOUR LIFE', v: `${engine.playerHp} / ${engine.playerMaxHp}`, col: '#FF7066' },
+          { k: `${engine.rival.name.toUpperCase()} LIFE`, v: `${engine.oppHp} / ${engine.oppMaxHp}`, col: '#F2CA6B' },
+          { k: 'COUNTERED BY', v: c ? c.oppTrick.comboShort : 'OUTLASTED', col: '#F0B2AC' },
+        ];
 
-      ctx.fillStyle = '#A8A3B8';
-      ctx.font = '800 11px system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(st.label, sx + sw / 2, by + 170);
-
-      ctx.fillStyle = st.accent;
-      ctx.font = '900 22px Georgia, serif';
-      ctx.fillText(st.value, sx + sw / 2, by + 198);
+    const sw = 206;
+    const sx0 = CENTER_X - (sw * 3 + 36) / 2;
+    for (let i = 0; i < 3; i += 1) {
+      const sx = sx0 + i * (sw + 18);
+      box(ctx, sx, by + 144, sw, 72, 10, isWin ? 'rgba(11,20,15,0.82)' : 'rgba(13,14,23,0.86)', isWin ? 'rgba(236,198,108,0.48)' : 'rgba(214,104,98,0.48)', 1.4);
+      label(ctx, stats[i].k, sx + sw / 2, by + 165, `800 11px ${UI_FONT}`, isWin ? '#D6C6A4' : '#B9B4C9');
+      label(ctx, stats[i].v, sx + sw / 2, by + 195, `900 ${isWin ? 24 : 22}px Georgia, serif`, stats[i].col);
     }
 
-    // Action buttons
-    this.drawButton(ctx, 'btn-rematch', CENTER_X - 210, by + 240, 210, 52, 'REMATCH  [R]', { crimson: true, fontSize: 16, radius: 11 }, null, uiState.hoveredButtonId);
-    this.drawButton(ctx, 'btn-title', CENTER_X + 18, by + 240, 192, 52, 'CHANGE RIVAL', { fontSize: 14, radius: 11 }, null, uiState.hoveredButtonId);
+    if (isWin) {
+      const nextRival = RIVALS[(engine.rivalIndex + 1) % RIVALS.length];
+      this.drawButton(ctx, 'btn-next-rival', CENTER_X - 246, by + 246, 224, 54, `NEXT: ${nextRival.name.toUpperCase()}  ▸`, { primary: true, fontSize: 15, radius: 11 }, null, uiState.hoveredButtonId);
+      this.drawButton(ctx, 'btn-rematch', CENTER_X - 6, by + 246, 146, 54, 'REMATCH [R]', { fontSize: 14, radius: 11 }, null, uiState.hoveredButtonId);
+      this.drawButton(ctx, 'btn-title', CENTER_X + 154, by + 246, 96, 54, 'TITLE', { fontSize: 14, radius: 11 }, null, uiState.hoveredButtonId);
+    } else {
+      this.drawButton(ctx, 'btn-rematch', CENTER_X - 210, by + 246, 210, 54, 'REMATCH  [R]', { crimson: true, fontSize: 16, radius: 11 }, null, uiState.hoveredButtonId);
+      this.drawButton(ctx, 'btn-title', CENTER_X + 18, by + 246, 192, 54, 'CHANGE RIVAL', { fontSize: 14, radius: 11 }, null, uiState.hoveredButtonId);
+    }
   }
 
   drawRulesModal(ctx, uiState) {
     ctx.save();
-    ctx.fillStyle = 'rgba(6, 8, 10, 0.72)';
+    ctx.fillStyle = 'rgba(6,8,10,0.74)';
     ctx.fillRect(0, 0, STAGE_W, STAGE_H);
-
-    const mw = 760;
-    const mh = 510;
+    const mw = 768;
+    const mh = 516;
     const mx = (STAGE_W - mw) / 2;
     const my = (STAGE_H - mh) / 2;
-    this.drawPanelBox(ctx, mx, my, mw, mh, '#F0C860', 'rgba(26, 18, 12, 0.97)', 'rgba(13, 24, 19, 0.98)');
-
-    ctx.fillStyle = '#FFE07A';
-    ctx.font = '900 28px Georgia, serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('HOW TO PLAY LANTERN TRICK', STAGE_W / 2, my + 42);
+    this.drawPanelBox(ctx, mx, my, mw, mh, '#F0C860', 'rgba(26,18,12,0.97)', 'rgba(13,24,19,0.98)');
+    label(ctx, 'HOW TO PLAY LANTERN TRICK', STAGE_W / 2, my + 40, '900 26px Georgia, serif', '#FFE07A');
 
     const lines = [
-      '1. READ THE RIVAL TELL — Each round your rival places 1 card face-up plus any hidden backup with a visible Tell.',
-      '2. COMBINE 1 TO 3 CARDS — Spend Lanterns (1–3 cost per card) to build higher-scoring combos:',
+      '1. READ THE RIVAL TELL & RELIC — Each round your rival shows 1 face-up card + hidden Tell, plus their Relic passive.',
+      '2. TRACK RIVAL SUITS — Watch "Rival Suits Left" on the left panel to anticipate their hidden combo card.',
+      '3. COMBINE 1 TO 3 CARDS — Spend Lantern coins (cost 1–3 per card) to trigger combos:',
       '   • PAIR RESONANCE (same rank): +5 PWR & pierces 2 Ward    • SUIT HARMONY (2–3 same suit): +4 / +8 PWR',
       '   • CHAIN RUN (consecutive ranks e.g. 4-5-6): +4 / +9 PWR   • PRISM TRIAD (3 suits): +6 PWR, ignores Trump',
-      '3. ELEMENTAL TRUMPS (+3 PWR & COUNTER-BREAK):',
-      '   • Ember (Red Diamond) > Bramble (Green Leaf) > Tide (Blue Crescent) > Ember',
-      '   • Brass (Gold Sun Gear) is Neutral and grants +2 Ward & +1 Next-Turn Lantern in any 2–3 card combo!',
-      '4. BRACE & CYCLE — Out of Lanterns or bad hand? Cycle discards 1–2 cards, shields you, and grants +2 Lanterns next turn.',
-      '5. CONTROLS — Click cards (or keys 1–5), drag to table or press Space/Enter to play, C to cycle, M to mute, R to rematch.',
+      '4. ELEMENTAL TRUMPS (+3 PWR & COUNTER-BREAK):',
+      '   • Ember (Red Diamond) > Bramble (Green Leaf) > Tide (Blue Crescent) > Ember · Brass (Gold Gear) adds Ward + Lanterns.',
+      '5. KINDLE HEARTH [C] — Discard 1–2 cards to gain +4 carry-over Ward & +2 Lanterns next round.',
+      '6. CONTROLS — Click cards (or keys 1–5), drag onto the table or press Space/Enter to play, M to mute, R to rematch.',
     ];
-
-    ctx.textAlign = 'left';
-    ctx.font = '600 14px system-ui, -apple-system, sans-serif';
     for (let i = 0; i < lines.length; i += 1) {
-      const isHeading = lines[i].startsWith('1.') || lines[i].startsWith('2.') || lines[i].startsWith('3.') || lines[i].startsWith('4.') || lines[i].startsWith('5.');
-      ctx.fillStyle = isHeading ? '#FFE7A3' : '#DCD0B6';
-      ctx.font = isHeading ? '800 14px system-ui, sans-serif' : '600 13.5px system-ui, sans-serif';
-      ctx.fillText(lines[i], mx + 36, my + 96 + i * 38);
+      const head = /^\d\./.test(lines[i]);
+      label(ctx, lines[i], mx + 32, my + 92 + i * 38, head ? `800 13.5px ${UI_FONT}` : `600 13px ${UI_FONT}`, head ? '#FFE7A3' : '#DCD0B6', 'left');
     }
-
-    this.drawButton(ctx, 'btn-close-rules', STAGE_W / 2 - 90, my + mh - 66, 180, 44, 'GOT IT  [ESC]', { primary: true, fontSize: 15 }, null, uiState.hoveredButtonId);
+    this.drawButton(ctx, 'btn-close-rules', STAGE_W / 2 - 90, my + mh - 64, 180, 44, 'GOT IT  [ESC]', { primary: true, fontSize: 15 }, null, uiState.hoveredButtonId);
     ctx.restore();
   }
 }
