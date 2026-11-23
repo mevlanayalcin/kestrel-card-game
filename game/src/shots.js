@@ -9,93 +9,48 @@ function chooseTacticalPlayerPlay(engine) {
   const oppSuit = engine.oppTelegraph?.leadSuit;
   let best = subsets[0];
   let bestScore = -Infinity;
-
-  for (const subset of subsets) {
-    const trick = evaluateTrick(subset);
-    const trumps = doesSuitTrump(trick.leadSuit, oppSuit);
-    let score = trick.totalPower * 1.6 + trick.comboBonus * 1.4;
-    if (trumps) score += 6.5;
-    score += trick.burn * 1.4 + trick.chill * 1.2 + trick.ward * 0.9 + trick.heal * (engine.playerHp < 22 ? 1.5 : 0.4);
-    if (subset.length >= 2 && trick.comboBonus >= 4) score += 3.0;
-    if (score > bestScore) {
-      bestScore = score;
-      best = subset;
-    }
+  for (const sub of subsets) {
+    const tr = evaluateTrick(sub);
+    const trumps = doesSuitTrump(tr.leadSuit, oppSuit);
+    let score = tr.totalPower * 1.6 + tr.comboBonus * 1.4 + (trumps ? 6.5 : 0);
+    score += tr.burn * 1.4 + tr.chill * 1.2 + tr.ward * 0.9 + tr.heal * (engine.playerHp < 22 ? 1.5 : 0.4);
+    if (sub.length >= 2 && tr.comboBonus >= 4) score += 3.0;
+    if (score > bestScore) { bestScore = score; best = sub; }
   }
   return best;
 }
 
 function chooseRecklessPlayerPlay(engine) {
-  // Simulates a hurried player playing un-comboed / trumped 2-card hands against Corvus's tells
   const subsets = enumerateValidSubsets(engine.playerHand, engine.playerLanterns, 2);
   if (subsets.length === 0) return [];
   const oppSuit = engine.oppTelegraph?.leadSuit;
   const oppEst = engine.oppTelegraph?.estimatedPower ?? 14;
   let chosen = subsets[0];
   let bestScore = -Infinity;
-
-  for (const subset of subsets) {
-    const tr = evaluateTrick(subset);
+  for (const sub of subsets) {
+    const tr = evaluateTrick(sub);
     const getsTrumped = doesSuitTrump(oppSuit, tr.leadSuit);
-    // Prefer a realistic 2-card play that still loses fairly to Corvus's bigger combo
-    let score = (subset.length === 2 ? 12 : 0) - tr.comboBonus * 2 + (getsTrumped ? 7 : 0);
-    if (tr.totalPower < oppEst - 2) score += 8;
-    else score -= 12;
+    let score = (sub.length === 2 ? 12 : 0) - tr.comboBonus * 2 + (getsTrumped ? 7 : 0);
+    score += tr.totalPower < oppEst - 2 ? 8 : -12;
     if (tr.leadSuit === 'brass') score -= 4;
-    if (score > bestScore) {
-      bestScore = score;
-      chosen = subset;
-    }
+    if (score > bestScore) { bestScore = score; chosen = sub; }
   }
   return chosen;
 }
 
+function setupMidRunState(engine, rivalIndex, seed, relics) {
+  engine.playerRelics = relics.slice();
+  engine.trophies = relics.length;
+  engine.playerScore = relics.length * 620;
+  engine.startMatch(rivalIndex, seed, true);
+}
+
 function runSimulatedPlay(engine, targetRound, seed) {
-  for (let offset = 0; offset < 120; offset += 1) {
-    engine.startMatch(0, seed + offset);
+  // Mid-run Round 4 duel vs Sable (Rival 3/5) with 2 drafted Relics & active Gambit ×2 raise!
+  const runRelics = ['cinder_lens', 'briar_ring'];
+  for (let offset = 0; offset < 140; offset += 1) {
+    setupMidRunState(engine, 2, seed + offset, runRelics);
     let ok = true;
-    for (let r = 1; r < targetRound; r += 1) {
-      const pick = chooseTacticalPlayerPlay(engine);
-      if (pick.length === 0) {
-        engine.cycleSelectedCards();
-      } else {
-        for (const c of pick) engine.toggleSelectCard(c.uid);
-        engine.playSelectedTrick();
-      }
-      engine.advanceFromClash();
-      if (engine.phase !== PHASES.SELECT) {
-        ok = false;
-        break;
-      }
-    }
-    if (!ok) continue;
-
-    // Pick a vivid tactical moment: rival has 2 cards (1 face-up + 1 tell), both took real damage, & player has a trumping combo!
-    const pick = chooseTacticalPlayerPlay(engine);
-    const trick = evaluateTrick(pick);
-    const hasTell = engine.oppCommittedCards.length >= 2;
-    const hasCombo = pick.length >= 2 && trick.comboBonus >= 4;
-    const hasTrump = doesSuitTrump(trick.leadSuit, engine.oppTelegraph?.leadSuit);
-    const ties = engine.chronicle.filter((c) => c.winner === 'tie').length;
-    if (
-      hasTell &&
-      hasCombo &&
-      hasTrump &&
-      ties === 0 &&
-      engine.playerHand.length === 5 &&
-      engine.oppHp >= 8 &&
-      engine.oppHp <= 20 &&
-      engine.playerHp >= 15 &&
-      engine.playerHp <= 26
-    ) {
-      for (const c of pick) engine.toggleSelectCard(c.uid);
-      return;
-    }
-  }
-
-  // Secondary fallback: relax playerHp slightly while preserving real multi-card combo + tell
-  for (let offset = 0; offset < 60; offset += 1) {
-    engine.startMatch(0, seed + offset);
     for (let r = 1; r < targetRound; r += 1) {
       const pick = chooseTacticalPlayerPlay(engine);
       if (pick.length === 0) engine.cycleSelectedCards();
@@ -104,120 +59,117 @@ function runSimulatedPlay(engine, targetRound, seed) {
         engine.playSelectedTrick();
       }
       engine.advanceFromClash();
-      if (engine.phase !== PHASES.SELECT) break;
+      if (engine.phase !== PHASES.SELECT) { ok = false; break; }
     }
-    if (engine.phase !== PHASES.SELECT) continue;
+    if (!ok) continue;
+
     const pick = chooseTacticalPlayerPlay(engine);
     const trick = evaluateTrick(pick);
-    if (engine.oppCommittedCards.length >= 2 && pick.length >= 2 && trick.comboBonus >= 4) {
+    const hasTell = engine.oppCommittedCards.length >= 2;
+    const hasCombo = pick.length >= 2 && trick.comboBonus >= 4;
+    const hasTrump = doesSuitTrump(trick.leadSuit, engine.oppTelegraph?.leadSuit);
+    const ties = engine.chronicle.filter((c) => c.winner === 'tie').length;
+    if (
+      hasTell && hasCombo && hasTrump && ties === 0 &&
+      engine.playerHand.length === 5 &&
+      engine.oppHp >= 8 && engine.oppHp <= 24 &&
+      engine.playerHp >= 14 && engine.playerHp <= 27
+    ) {
+      if (!engine.gambitActive) engine.toggleGambitRaise();
       for (const c of pick) engine.toggleSelectCard(c.uid);
       return;
     }
   }
-}
 
-function runSimulatedVictory(engine, seed) {
-  for (let offset = 0; offset < 90; offset += 1) {
-    const trial = new MatchEngine(seed + offset);
-    trial.startMatch(0, seed + offset);
-    let safety = 0;
-    while (trial.phase === PHASES.SELECT && safety < 14) {
-      safety += 1;
-      const pick = chooseTacticalPlayerPlay(trial);
-      if (pick.length === 0) trial.cycleSelectedCards();
-      else {
-        for (const c of pick) trial.toggleSelectCard(c.uid);
-        trial.playSelectedTrick();
-      }
-      trial.advanceFromClash();
-    }
-    if (
-      trial.phase === PHASES.VICTORY &&
-      trial.round >= 4 &&
-      trial.round <= 8 &&
-      trial.oppHp === 0 &&
-      trial.playerHp >= 10 &&
-      trial.playerHp <= 27 &&
-      trial.playerPlayedCards.length >= 2 &&
-      trial.lastClash?.playerTrick?.comboBonus >= 4 &&
-      trial.lastClash?.damageToOpp >= 6
-    ) {
-      replayInto(engine, 0, seed + offset, chooseTacticalPlayerPlay);
-      return;
-    }
+  setupMidRunState(engine, 2, seed, runRelics);
+  for (let r = 1; r < targetRound; r += 1) {
+    const pick = chooseTacticalPlayerPlay(engine);
+    if (pick.length === 0) engine.cycleSelectedCards();
+    else { for (const c of pick) engine.toggleSelectCard(c.uid); engine.playSelectedTrick(); }
+    engine.advanceFromClash();
+    if (engine.phase !== PHASES.SELECT) break;
   }
-  replayInto(engine, 0, seed, chooseTacticalPlayerPlay);
-}
-
-function runSimulatedDefeat(engine, seed) {
-  for (let offset = 0; offset < 120; offset += 1) {
-    const trial = new MatchEngine(seed + offset);
-    trial.startMatch(2, seed + offset);
-    let safety = 0;
-    while (trial.phase === PHASES.SELECT && safety < 14) {
-      safety += 1;
-      // Play smart on Rounds 1-2 so it is a genuine back-and-forth match before Corvus outplays reckless reads
-      const pick = safety <= 2 ? chooseTacticalPlayerPlay(trial) : chooseRecklessPlayerPlay(trial);
-      if (pick.length === 0) trial.cycleSelectedCards();
-      else {
-        for (const c of pick) trial.toggleSelectCard(c.uid);
-        trial.playSelectedTrick();
-      }
-      trial.advanceFromClash();
-    }
-    if (
-      trial.phase === PHASES.DEFEAT &&
-      trial.round >= 4 &&
-      trial.playerHp === 0 &&
-      trial.oppHp >= 8 &&
-      trial.oppHp <= 25 &&
-      trial.oppCommittedCards.length >= 2 &&
-      trial.playerPlayedCards.length === 2
-    ) {
-      replayDefeatInto(engine, 2, seed + offset);
-      return;
-    }
+  if (engine.phase === PHASES.SELECT) {
+    if (!engine.gambitActive) engine.toggleGambitRaise();
+    const pick = chooseTacticalPlayerPlay(engine);
+    for (const c of pick) engine.toggleSelectCard(c.uid);
   }
-  replayDefeatInto(engine, 2, seed);
 }
 
-function replayInto(engine, rivalIndex, seed, policy) {
-  engine.startMatch(rivalIndex, seed);
+function replayVictoryInto(engine, rivalIndex, seed, relics) {
+  setupMidRunState(engine, rivalIndex, seed, relics);
   let safety = 0;
   while (engine.phase === PHASES.SELECT && safety < 14) {
     safety += 1;
-    const pick = policy(engine);
-    if (pick.length === 0) engine.cycleSelectedCards();
-    else {
-      for (const c of pick) engine.toggleSelectCard(c.uid);
-      engine.playSelectedTrick();
+    const pick = chooseTacticalPlayerPlay(engine);
+    const tr = evaluateTrick(pick);
+    if (safety >= 2 && !engine.gambitActive && tr.comboBonus >= 5 && doesSuitTrump(tr.leadSuit, engine.oppTelegraph?.leadSuit)) {
+      engine.toggleGambitRaise();
     }
+    if (pick.length === 0) engine.cycleSelectedCards();
+    else { for (const c of pick) engine.toggleSelectCard(c.uid); engine.playSelectedTrick(); }
     engine.advanceFromClash();
   }
 }
 
-function replayDefeatInto(engine, rivalIndex, seed) {
-  engine.startMatch(rivalIndex, seed);
+function runSimulatedVictory(engine, seed) {
+  const runRelics = ['cinder_lens', 'briar_ring'];
+  for (let offset = 0; offset < 100; offset += 1) {
+    const trial = new MatchEngine(seed + offset);
+    replayVictoryInto(trial, 2, seed + offset, runRelics);
+    if (
+      trial.phase === PHASES.VICTORY &&
+      trial.round >= 4 && trial.round <= 8 &&
+      trial.oppHp === 0 &&
+      trial.playerHp >= 12 && trial.playerHp <= 28 &&
+      trial.playerPlayedCards.length >= 2 &&
+      trial.lastClash?.playerTrick?.comboBonus >= 4 &&
+      trial.lastClash?.damageToOpp >= 7 &&
+      trial.draftChoices.length === 3
+    ) {
+      replayVictoryInto(engine, 2, seed + offset, runRelics);
+      return;
+    }
+  }
+  replayVictoryInto(engine, 2, seed, runRelics);
+}
+
+function replayDefeatInto(engine, rivalIndex, seed, relics) {
+  setupMidRunState(engine, rivalIndex, seed, relics);
   let safety = 0;
   while (engine.phase === PHASES.SELECT && safety < 14) {
     safety += 1;
     const pick = safety <= 2 ? chooseTacticalPlayerPlay(engine) : chooseRecklessPlayerPlay(engine);
     if (pick.length === 0) engine.cycleSelectedCards();
-    else {
-      for (const c of pick) engine.toggleSelectCard(c.uid);
-      engine.playSelectedTrick();
-    }
+    else { for (const c of pick) engine.toggleSelectCard(c.uid); engine.playSelectedTrick(); }
     engine.advanceFromClash();
   }
 }
 
+function runSimulatedDefeat(engine, seed) {
+  // Dramatic climax defeat vs Aurelius the Grandmaster (Rival 5/5) with 3 drafted relics on the line!
+  const runRelics = ['cinder_lens', 'briar_ring', 'gilded_seal'];
+  for (let offset = 0; offset < 120; offset += 1) {
+    const trial = new MatchEngine(seed + offset);
+    replayDefeatInto(trial, 4, seed + offset, runRelics);
+    if (
+      trial.phase === PHASES.DEFEAT &&
+      trial.round >= 4 &&
+      trial.playerHp === 0 &&
+      trial.oppHp >= 8 && trial.oppHp <= 28 &&
+      trial.oppCommittedCards.length >= 2 &&
+      trial.playerPlayedCards.length === 2
+    ) {
+      replayDefeatInto(engine, 4, seed + offset, runRelics);
+      return;
+    }
+  }
+  replayDefeatInto(engine, 4, seed, runRelics);
+}
+
 export function stageShot(name, seed, engine, renderer, anim, uiState) {
   const mode = (name || 'title').toLowerCase();
-  anim.particles = [];
-  anim.callouts = [];
-  anim.shake = 0;
-  anim.flash = 0;
-  anim.time = 1.65;
+  anim.particles = []; anim.callouts = []; anim.shake = 0; anim.flash = 0; anim.time = 1.65;
 
   if (mode === 'title' || mode === 'start') {
     engine.phase = PHASES.TITLE;
@@ -231,8 +183,7 @@ export function stageShot(name, seed, engine, renderer, anim, uiState) {
     runSimulatedPlay(engine, 4, seed);
     renderer.syncCardTargets(engine, anim, uiState);
     anim.snapAll();
-    // Subtle golden glow sparks above selected combo cards
-    anim.spawnBurst(630, 505, '#FFE072', 14, 95, 35, 412);
+    anim.spawnBurst(630, 505, '#FFE072', 14, 95, 36, 412);
     anim.step(0.18, false);
     return;
   }
@@ -241,7 +192,7 @@ export function stageShot(name, seed, engine, renderer, anim, uiState) {
     runSimulatedVictory(engine, seed);
     renderer.syncCardTargets(engine, anim, uiState);
     anim.snapAll();
-    anim.spawnVictoryFlourish(630, 490);
+    anim.spawnVictoryFlourish(630, 345);
     anim.step(0.32, false);
     return;
   }

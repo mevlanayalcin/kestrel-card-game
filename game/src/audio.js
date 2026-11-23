@@ -124,4 +124,16 @@ export class SoundEngine {
       this.playTone(freq, 0.65, 'triangle', 0.08, idx * 0.11, freq * 0.96);
     });
   }
+
+  gambitGong() {
+    this.playTone(196, 0.55, 'triangle', 0.14, 0, 188);
+    this.playTone(392, 0.45, 'sine', 0.09, 0.02, 384);
+    this.playTone(587.33, 0.35, 'triangle', 0.06, 0.04);
+  }
+
+  relicClaim() {
+    [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => {
+      this.playTone(f, 0.32, 'triangle', 0.09, i * 0.055);
+    });
+  }
 }
